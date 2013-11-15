@@ -1,29 +1,28 @@
 (ns iris.core
-  (:refer-clojure :exclude [* - + == /]) ; get from core.matrix
-  (:use clojure.core.matrix)
-  ;;(:use clojure.core.matrix.operators)
+  (:require [clojure.core.matrix :as mat])
+  (:require [clojure.pprint :as pp])
   (:gen-class))
 
-(defonce state (atom {:framebuffer-width 320
-                      :framebuffer-height 240
-                      :viewport-width 320
-                      :viewport-height 240
+(defonce state (atom {:framebuffer-width 32
+                      :framebuffer-height 24
+                      :viewport [0 0 32 24]
                       :depth-range [0.0 1.0]
                       ;; manipulate via gluLookAt
-                      :view-matrix (identity-matrix 4)
+                      :view-matrix (mat/identity-matrix 4)
                       ;; manipulate via glScale/Rotate/Translate
-                      :model-matrix (identity-matrix 4)
+                      :model-matrix (mat/identity-matrix 4)
                       ;; object coords v = [x y z w]^T (column)
                       ;; eye-coords = model * view * v
                       ;; manipulate via glFrustum/Ortho
-                      :projection-matrix (identity-matrix 4)
+                      :projection-matrix (mat/identity-matrix 4)
                       ;; clip-coords = projection * eye-coord
                       }))
 
-(defonce framebuffer (atom (vec (repeat (clojure.core/*
-                                         (@state :framebuffer-width)
-                                         (@state :framebuffer-height))
-                                        {:r 0 :g 0 :b 0}))))
+(defonce framebuffer (atom (vec {:width 32
+                                 :height 24
+                                 :data (repeat (* 32 24)
+                                               {:r 0 :g 0 :b 0})}
+                                )))
 
 (defn evaluate
   "given an object, evaluate it to decompose it into triangles"
@@ -35,66 +34,106 @@
         :triangle-list (:vertices o)
         (assert false)))))
 
+;; (partial vertex-shader your-vs) ??
 (defn vertex-shader
   "input world-space vertices, output projected clip-coord vertices"
   [object-vertices]
   ;;(println "VS" object-vertices)
-  (for [o object-vertices]
+  (for [vertices object-vertices]
     (do
       ;;(println "O" o)
-      (for [v o]
+      (for [v vertices]
         (do
           ;;(println "vertex-shader" v)
-          (mmul (:projection-matrix @state)
-                (:view-matrix @state)
-                (:model-matrix @state)
-                (column-matrix [(:x v) (:y v) (:z v) 1])))))))
+          (into v {:clip
+                   (mat/mmul (:projection-matrix @state)
+                             (:view-matrix @state)
+                             (:model-matrix @state)
+                             (mat/column-matrix [(:x v) (:y v) (:z v) 1]))})
+          )))))
 
 (defn project-viewport
-  "input vertices in clip-coords, output processed
-  primitives in window-coords"
+  "input vertices in clip-coords, output processed primitives in
+  window-coords"
   [object-vertices]
   (for [vertices object-vertices]
     (do
-      (println "pv" vertices)
       (for [v vertices]
         (do
-          (println "pvv" v)
           ;; see OpenGL spec 2.11 Coordinate Transformations
-          (let [ndc-v (div (submatrix v [[0 3] [0 1]])
-                           (submatrix v [[3 1] [0 1]]))
-                _ (println "xx" ((ndc-v 1) 0))
-                px (:viewport-width @state)
-                ox (clojure.core// px 2) ;; FIXME
-                window-x (clojure.core/+ (clojure.core/* (clojure.core// px 2)
-                                                         ((ndc-v 0) 0))
-                                         ox)
-                py (:viewport-height @state)
-                oy (clojure.core// py 2) ;; FIXME
-                window-y (clojure.core/+ (clojure.core/* (clojure.core// py 2)
-                                                         ((ndc-v 1) 0))
-                                         oy)
-                [n f] (:depth-range @state)
-                window-z (clojure.core/+ (clojure.core/* (clojure.core// (clojure.core/- f n) 2)
-                                                       ((ndc-v 2) 0))
-                                         (clojure.core// (clojure.core/+ n f) 2))]
-            (column-matrix [window-x window-y window-z])))))))
+          (let [clip-v (:clip v)
+                ndc-v (mat/div (mat/submatrix clip-v [[0 3] [0 1]])
+                               (mat/submatrix clip-v [[3 1] [0 1]]))
+                [vox voy px py] (:viewport @state)
+                ox       (+ vox (/ px 2))
+                window-x (+ (* (/ px 2) ((ndc-v 0) 0)) ox)
+                oy       (+ voy (/ py 2))
+                window-y (+ (* (/ py 2) ((ndc-v 1) 0)) oy)
+                [n f]    (:depth-range @state)
+                window-z (+ (* (/ (- f n) 2) ((ndc-v 2) 0)) (/ (+ n f) 2))]
+            (into v {:window
+                     (mat/column-matrix [window-x window-y window-z])})
+            ))))))
 
 (defn primitive-clip-cull
   "input projected vertices, output primitives (triangles)"
   [object-vertices]
   (for [vertices object-vertices]
     (do
-      (println "pa" vertices)
+      ;;(println "pa" vertices)
       (for [p (partition 3 vertices)]
         (do
           ;;(println "primitive-assembly" p)
+          ;; clipless rasterizer :^) FIXME
           p)))))
+
+;; http://www.blackpawn.com/texts/pointinpoly/
+(defn same-side
+  [P1 P2 A B]
+  (let [p1 (mat/join P1 [0])
+        p2 (mat/join P2 [0])
+        a  (mat/join A [0])
+        b  (mat/join B [0])
+        cp1 (mat/cross (mat/sub b a) (mat/sub p1 a))
+        ;;_ (println cp1)
+        cp2 (mat/cross (mat/sub b a) (mat/sub p2 a))
+        ;;_ (println cp2)
+        dp (mat/dot cp1 cp2)]
+        ;;_ (println dp)]
+    (>= dp 0)))
+
+(defn pt-inside-tri?
+  [va vb vc pt]
+  (let [A (mat/get-column (mat/submatrix va [[0 2] [0 1]]) 0)
+        B (mat/get-column (mat/submatrix vb [[0 2] [0 1]]) 0)
+        C (mat/get-column (mat/submatrix vc [[0 2] [0 1]]) 0)]
+    (and (same-side pt A B C)
+         (same-side pt B A C)
+         (same-side pt C A B))))
+
+(defn rasterize-triangle
+  [va vb vc]
+  (let [x-min (min ((va 0) 0) ((vb 0) 0) ((vc 0) 0))
+        x-max (max ((va 0) 0) ((vb 0) 0) ((vc 0) 0))
+        y-min (min ((va 1) 0) ((vb 1) 0) ((vc 1) 0))
+        y-max (max ((va 1) 0) ((vb 1) 0) ((vc 1) 0))]
+    (filter #(pt-inside-tri? va vb vc %)
+            (for [x (range x-min x-max)
+                  y (range y-min y-max)]
+              ;; pixels are centered in the middle
+              [(+ x 0.5) (+ y 0.5)]))))
 
 (defn rasterize
   "input primitives, output rasterized fragments"
   [primitives]
-  [nil])
+  ;;(println "ra prims" primitives)
+  (for [prim (first primitives)] ;; FIXME
+    (do
+      ;;(println "ra prim" prim)
+      (into {} {:vertices prim
+                :pixels (rasterize-triangle (:window (nth prim 0))
+                                            (:window (nth prim 1))
+                                            (:window (nth prim 2)))}))))
 
 (defn fragment-shader
   "input unshaded fragments, output shaded fragments"
@@ -113,8 +152,8 @@
   (->> (evaluate objects)
        (vertex-shader)
        (project-viewport)
-       (primitive-clip-cull)))
-       ;;(rasterize)
+       (primitive-clip-cull)
+       (rasterize)))
        ;;(fragment-shader)
        ;;(framebuffer-operations)))
 
@@ -137,4 +176,4 @@
   "I don't do a whole lot ... yet."
   [& args]
   (println "Hello, World!")
-  (println (doall (run))))
+  (pp/pprint (doall (run))))
