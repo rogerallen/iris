@@ -1,14 +1,21 @@
 (ns iris.core
-  (:require [clojure.core.matrix :as mat])
-  (:require [clojure.pprint :as pp])
+  (:require [clojure.core.matrix :as mat]
+            [clojure.pprint :as pp]
+            [iris.geometry :as g])
   (:gen-class))
 
-(def WIDTH 320)
-(def HEIGHT 320)
+;; TODO
+;; o split into main/pipeline
+;; o add debug
+;; o geom/sphere
+;; o add normals & lighting
+;; o with-state+framebuffer?  that seems like a good thing.
+;; o output image file
 
-(defonce state (atom {:framebuffer-width WIDTH
-                      :framebuffer-height HEIGHT
-                      :viewport [0 0 WIDTH HEIGHT]
+(def WIDTH 32)
+(def HEIGHT 32)
+
+(defonce state (atom {:viewport [0 0 WIDTH HEIGHT]
                       :depth-range [0.0 1.0]
                       ;; manipulate via gluLookAt
                       :view-matrix (mat/identity-matrix 4)
@@ -31,11 +38,7 @@
   "given an object, evaluate it to decompose it into triangles"
   [objects]
   (for [o objects]
-    (do
-      ;;(println "evaluate" o)
-      (case (:type o)
-        :triangle-list (:vertices o)
-        (assert false)))))
+    (g/evaluate-object o)))
 
 ;; (partial vertex-shader your-vs) ??
 (defn vertex-shader
