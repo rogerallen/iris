@@ -3,9 +3,12 @@
   (:require [clojure.pprint :as pp])
   (:gen-class))
 
-(defonce state (atom {:framebuffer-width 32
-                      :framebuffer-height 24
-                      :viewport [0 0 32 24]
+(def WIDTH 320)
+(def HEIGHT 320)
+
+(defonce state (atom {:framebuffer-width WIDTH
+                      :framebuffer-height HEIGHT
+                      :viewport [0 0 WIDTH HEIGHT]
                       :depth-range [0.0 1.0]
                       ;; manipulate via gluLookAt
                       :view-matrix (mat/identity-matrix 4)
@@ -18,11 +21,11 @@
                       ;; clip-coords = projection * eye-coord
                       }))
 
-(defonce framebuffer (atom (vec {:width 32
-                                 :height 24
-                                 :data (repeat (* 32 24)
-                                               {:r 0 :g 0 :b 0 :z 1})}
-                                )))
+(defonce framebuffer (atom {:width WIDTH
+                            :height HEIGHT
+                            :data (vec (repeat (* WIDTH HEIGHT)
+                                               {:r 0 :g 0 :b 0 :z 1}))}
+                           ))
 
 (defn evaluate
   "given an object, evaluate it to decompose it into triangles"
@@ -206,8 +209,37 @@
 
 (defn framebuffer-operations
   "input shaded fragments, write them to the framebuffer"
-  [fragments]
-  nil)
+  [object-prim-pixels]
+  (doseq [prim-pixels object-prim-pixels]
+    (let [prim (:vertices prim-pixels)
+          pixels (:pixels prim-pixels)]
+      ;; FIXME add different types of blending/depth buffering
+      (doseq [src-pixel pixels]
+        (let [w (:width @framebuffer)
+              h (:height @framebuffer)
+              x (Math/floor (:x src-pixel))
+              y (Math/floor (:y src-pixel))
+              i (int (+ (* y w) x))
+              dest-pixel ((:data @framebuffer) i)]
+          (when (< (:z src-pixel) (:z dest-pixel))
+            (swap! framebuffer
+                   (fn [x]
+                     (into x {:data (assoc (:data x) i src-pixel)}))))))
+      ))
+  object-prim-pixels)
+
+(defn print-ppm
+  []
+  (println "P3" (:width @framebuffer) (:height @framebuffer) 255)
+  (doseq [y (range (:height @framebuffer))]
+    (do
+      (doseq [x (range (:width @framebuffer))]
+        (let [i (int (+ (* y (:width @framebuffer)) x))
+              r (int (Math/floor (+ 0.5 (* 255 (:r ((:data @framebuffer) i))))))
+              g (int (Math/floor (+ 0.5 (* 255 (:g ((:data @framebuffer) i))))))
+              b (int (Math/floor (+ 0.5 (* 255 (:b ((:data @framebuffer) i))))))]
+          (print r g b " ")))
+      (println))))
 
 (defn draw
   "take in an object, decompose it to triangles, pass them through the
@@ -218,8 +250,8 @@
        (project-viewport)
        (primitive-clip-cull)
        (rasterize)
-       (pixel-shader)))
-       ;;(framebuffer-operations)))
+       (pixel-shader)
+       (framebuffer-operations)))
 
 ;;(println (run))
 
@@ -230,9 +262,9 @@
                              {:x 1.0 :y 0.0 :z 0.0 :r 0.0 :g 1.0 :b 0.0}
                              {:x 1.0 :y 1.0 :z 0.0 :r 0.0 :g 0.0 :b 1.0}
 
-                             {:x 0.0 :y 0.0 :z 0.5 :r 1.0 :g 0.0 :b 0.0}
+                             {:x -1.0 :y -1.0 :z 0.5 :r 1.0 :g 0.0 :b 0.0}
                              {:x 0.5 :y 0.0 :z 0.5 :r 0.0 :g 1.0 :b 0.0}
-                             {:x 0.5 :y 0.5 :z 0.5 :r 0.0 :g 0.0 :b 1.0}
+                             {:x 0.5 :y 1.0 :z 0.5 :r 0.0 :g 0.0 :b 1.0}
                              ]}]]
     (draw objects)))
 
@@ -240,5 +272,6 @@
 
 (defn -main
   [& args]
-  (println "Iris is Drawing...")
-  (pp/pprint (doall (run))))
+  (let [debug-results (doall (run))]
+    ;;(pp/pprint debug-results)
+    (print-ppm)))
