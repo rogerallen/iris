@@ -21,7 +21,7 @@
 (defonce framebuffer (atom (vec {:width 32
                                  :height 24
                                  :data (repeat (* 32 24)
-                                               {:r 0 :g 0 :b 0})}
+                                               {:r 0 :g 0 :b 0 :z 1})}
                                 )))
 
 (defn evaluate
@@ -46,10 +46,12 @@
         (do
           ;;(println "vertex-shader" v)
           (into v {:clip
-                   (mat/mmul (:projection-matrix @state)
-                             (:view-matrix @state)
-                             (:model-matrix @state)
-                             (mat/column-matrix [(:x v) (:y v) (:z v) 1]))})
+                   (mat/get-column
+                    (mat/mmul (:projection-matrix @state)
+                              (:view-matrix @state)
+                              (:model-matrix @state)
+                              (mat/column-matrix [(:x v) (:y v) (:z v) 1]))
+                    0)})
           )))))
 
 (defn project-viewport
@@ -62,17 +64,20 @@
         (do
           ;; see OpenGL spec 2.11 Coordinate Transformations
           (let [clip-v (:clip v)
-                ndc-v (mat/div (mat/submatrix clip-v [[0 3] [0 1]])
-                               (mat/submatrix clip-v [[3 1] [0 1]]))
+                ;; ndc = x/w y/w z/w 1/w
+                ndc-v (mat/div
+                       (mat/join (take 3 clip-v) [1])
+                       (nth clip-v 3))
                 [vox voy px py] (:viewport @state)
                 ox       (+ vox (/ px 2))
-                window-x (+ (* (/ px 2) ((ndc-v 0) 0)) ox)
+                window-x (+ (* (/ px 2) (ndc-v 0)) ox)
                 oy       (+ voy (/ py 2))
-                window-y (+ (* (/ py 2) ((ndc-v 1) 0)) oy)
+                window-y (+ (* (/ py 2) (ndc-v 1)) oy)
                 [n f]    (:depth-range @state)
-                window-z (+ (* (/ (- f n) 2) ((ndc-v 2) 0)) (/ (+ n f) 2))]
-            (into v {:window
-                     (mat/column-matrix [window-x window-y window-z])})
+                window-z (+ (* (/ (- f n) 2) (ndc-v 2)) (/ (+ n f) 2))
+                window-w (ndc-v 3)
+                ]
+            (into v {:window [window-x window-y window-z window-w]})
             ))))))
 
 (defn primitive-clip-cull
@@ -104,19 +109,19 @@
 
 (defn pt-inside-tri?
   [va vb vc pt]
-  (let [A (mat/get-column (mat/submatrix va [[0 2] [0 1]]) 0)
-        B (mat/get-column (mat/submatrix vb [[0 2] [0 1]]) 0)
-        C (mat/get-column (mat/submatrix vc [[0 2] [0 1]]) 0)]
+  (let [A (take 2 va)
+        B (take 2 vb)
+        C (take 2 vc)]
     (and (same-side pt A B C)
          (same-side pt B A C)
          (same-side pt C A B))))
 
 (defn rasterize-triangle
   [va vb vc]
-  (let [x-min (min ((va 0) 0) ((vb 0) 0) ((vc 0) 0))
-        x-max (max ((va 0) 0) ((vb 0) 0) ((vc 0) 0))
-        y-min (min ((va 1) 0) ((vb 1) 0) ((vc 1) 0))
-        y-max (max ((va 1) 0) ((vb 1) 0) ((vc 1) 0))]
+  (let [x-min (min (va 0) (vb 0) (vc 0))
+        x-max (max (va 0) (vb 0) (vc 0))
+        y-min (min (va 1) (vb 1) (vc 1))
+        y-max (max (va 1) (vb 1) (vc 1))]
     (filter #(pt-inside-tri? va vb vc %)
             (for [x (range x-min x-max)
                   y (range y-min y-max)]
@@ -130,15 +135,74 @@
   (for [prim (first primitives)] ;; FIXME
     (do
       ;;(println "ra prim" prim)
-      (into {} {:vertices prim
-                :pixels (rasterize-triangle (:window (nth prim 0))
-                                            (:window (nth prim 1))
-                                            (:window (nth prim 2)))}))))
+      {:vertices prim
+       :pixels (rasterize-triangle (:window (nth prim 0))
+                                   (:window (nth prim 1))
+                                   (:window (nth prim 2)))})))
+;;(println (run))
 
-(defn fragment-shader
-  "input unshaded fragments, output shaded fragments"
-  [fragments]
-  [nil])
+(defn triangle-area
+  [a b c]
+  (let [ab (mat/join (mat/sub b a) [0])
+        ac (mat/join (mat/sub c a) [0])
+        aa (mat/cross ab ac)
+        mag (Math/abs (nth aa 2))]
+  (* 0.5 mag)))
+;; (triangle-area [0 0] [10 0] [10 10])
+
+(defn interpolate
+  "interpolate barycentric coords according to formula 3.6 in OpenGL Spec 1.5"
+  [attr prim aow bow cow]
+  (let [fa (attr (nth prim 0))
+        fb (attr (nth prim 1))
+        fc (attr (nth prim 2))
+        ]
+    (/ (+ (* fa aow) (* fb bow) (* fc cow))
+       (+ (* 1 aow) (* 1 bow) (* 1 cow))))) ;; FIXME for q
+
+(defn shade-pixel
+  [prim x y]
+  (let [pt [x y]
+        pa (take 2 (:window (nth prim 0)))
+        pb (take 2 (:window (nth prim 1)))
+        pc (take 2 (:window (nth prim 2)))
+        oowa (nth (:window (nth prim 0)) 3)
+        oowb (nth (:window (nth prim 1)) 3)
+        oowc (nth (:window (nth prim 2)) 3)
+        Aabc (triangle-area pa pb pc)
+        Apbc (triangle-area pt pb pc)
+        Apac (triangle-area pt pa pc)
+        Apab (triangle-area pt pa pb)
+        a (/ Apbc Aabc)
+        b (/ Apac Aabc)
+        c (/ Apab Aabc) ;; 1-a-b ?
+        aow (* a oowa)
+        bow (* b oowb)
+        cow (* c oowc)
+        r (interpolate :r prim aow bow cow)
+        g (interpolate :g prim aow bow cow)
+        b (interpolate :b prim aow bow cow)
+        z-prim (map #(hash-map :z (nth (:window (nth prim %)) 2)) (range 3))
+        z (interpolate :z z-prim aow bow cow)
+        ]
+    {:x x :y y :z z :r r :g g :b b}))
+
+
+(defn pixel-shader
+  "input unshaded pixels, output shaded pixels"
+  [object-prim-pixels]
+  ;;(println "PS" object-prim-pixels)
+  (for [prim-pixels object-prim-pixels]
+    (let [prim (:vertices prim-pixels)
+          pixels (:pixels prim-pixels)]
+      ;;(println "prim-pixels" prim pixels)
+      {:vertices prim
+       :pixels (for [p pixels]
+                  (let [x (first p)
+                        y (second p)]
+                    ;;(println "pixel-shader" x y)
+                    (into {:x x :y y} (shade-pixel prim x y))))}
+      )))
 
 (defn framebuffer-operations
   "input shaded fragments, write them to the framebuffer"
@@ -153,9 +217,11 @@
        (vertex-shader)
        (project-viewport)
        (primitive-clip-cull)
-       (rasterize)))
-       ;;(fragment-shader)
+       (rasterize)
+       (pixel-shader)))
        ;;(framebuffer-operations)))
+
+;;(println (run))
 
 (defn run []
   ;; while true, with-camera? with-frame?
@@ -170,10 +236,9 @@
                              ]}]]
     (draw objects)))
 
-;;(doall (run))
+;;(println (run))
 
 (defn -main
-  "I don't do a whole lot ... yet."
   [& args]
-  (println "Hello, World!")
+  (println "Iris is Drawing...")
   (pp/pprint (doall (run))))
