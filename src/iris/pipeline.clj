@@ -2,42 +2,16 @@
   (:require [clojure.core.matrix :as mat]
             [iris.geometry :as g]))
 
-;; TODO
-;; o add debug in-between pipeline stages
-;; o add normals & lighting
-
-(def WIDTH 32)
-(def HEIGHT 32)
-
-(defonce state (atom {:viewport [0 0 WIDTH HEIGHT]
-                      :depth-range [0.0 1.0]
-                      ;; manipulate via gluLookAt
-                      :view-matrix (mat/identity-matrix 4)
-                      ;; manipulate via glScale/Rotate/Translate
-                      :model-matrix (mat/identity-matrix 4)
-                      ;; object coords v = [x y z w]^T (column)
-                      ;; eye-coords = model * view * v
-                      ;; manipulate via glFrustum/Ortho
-                      :projection-matrix (mat/identity-matrix 4)
-                      ;; clip-coords = projection * eye-coord
-                      }))
-
-(defonce framebuffer (atom {:width WIDTH
-                            :height HEIGHT
-                            :data (vec (repeat (* WIDTH HEIGHT)
-                                               {:r 0 :g 0 :b 0 :z 1}))}
-                           ))
-
 (defn evaluate
   "given an object, evaluate it to decompose it into triangles"
-  [objects]
+  [state objects]
   (for [o objects]
     (g/evaluate-object o)))
 
 ;; (partial vertex-shader your-vs) ??
 (defn vertex-shader
   "input world-space vertices, output projected clip-coord vertices"
-  [object-vertices]
+  [state object-vertices]
   ;;(println "VS" object-vertices)
   (for [vertices object-vertices]
     (do
@@ -47,9 +21,9 @@
           ;;(println "vertex-shader" v)
           (into v {:clip
                    (mat/get-column
-                    (mat/mmul (:projection-matrix @state)
-                              (:view-matrix @state)
-                              (:model-matrix @state)
+                    (mat/mmul (:projection-matrix state)
+                              (:view-matrix state)
+                              (:model-matrix state)
                               (mat/column-matrix [(:x v) (:y v) (:z v) 1]))
                     0)})
           )))))
@@ -57,7 +31,7 @@
 (defn project-viewport
   "input vertices in clip-coords, output processed primitives in
   window-coords"
-  [object-vertices]
+  [state object-vertices]
   (for [vertices object-vertices]
     (do
       (for [v vertices]
@@ -68,12 +42,12 @@
                 ndc-v (mat/div
                        (mat/join (take 3 clip-v) [1])
                        (nth clip-v 3))
-                [vox voy px py] (:viewport @state)
+                [vox voy px py] (:viewport state)
                 ox       (+ vox (/ px 2))
                 window-x (+ (* (/ px 2) (ndc-v 0)) ox)
                 oy       (+ voy (/ py 2))
                 window-y (+ (* (/ py 2) (ndc-v 1)) oy)
-                [n f]    (:depth-range @state)
+                [n f]    (:depth-range state)
                 window-z (+ (* (/ (- f n) 2) (ndc-v 2)) (/ (+ n f) 2))
                 window-w (ndc-v 3)
                 ]
@@ -82,7 +56,7 @@
 
 (defn primitive-clip-cull
   "input projected vertices, output primitives (triangles)"
-  [object-vertices]
+  [state object-vertices]
   (for [vertices object-vertices]
     (do
       ;;(println "pa" vertices)
@@ -130,15 +104,20 @@
 
 (defn rasterize
   "input primitives, output rasterized fragments"
-  [primitives]
+  [state primitives]
   ;;(println "ra prims" primitives)
   (for [prim (first primitives)] ;; FIXME
     (do
       ;;(println "ra prim" prim)
       {:vertices prim
-       :pixels (rasterize-triangle (:window (nth prim 0))
-                                   (:window (nth prim 1))
-                                   (:window (nth prim 2)))})))
+       :pixels (filter (fn [[x y]]
+                       (and (> x ((:viewport state) 0))
+                            (< x ((:viewport state) 2))
+                            (> y ((:viewport state) 1))
+                            (< y ((:viewport state) 3))))
+                     (rasterize-triangle (:window (nth prim 0))
+                                         (:window (nth prim 1))
+                                         (:window (nth prim 2))))})))
 ;;(println (run))
 
 (defn triangle-area
@@ -190,7 +169,7 @@
 
 (defn pixel-shader
   "input unshaded pixels, output shaded pixels"
-  [object-prim-pixels]
+  [state object-prim-pixels]
   ;;(println "PS" object-prim-pixels)
   (for [prim-pixels object-prim-pixels]
     (let [prim (:vertices prim-pixels)
@@ -204,49 +183,50 @@
                     (into {:x x :y y} (shade-pixel prim x y))))}
       )))
 
+(defn framebuffer-operations*
+  [state framebuffer object-prim-pixels]
+  (persistent!
+   (reduce
+    ;; reduce into a transient copy of the framebuffer
+    (fn [fb [i src-pixel]]
+      (let [dest-pixel (nth fb i)]
+        (if (< (:z src-pixel) (:z dest-pixel))
+          (assoc! fb i src-pixel)
+          fb)))
+    (transient (:data framebuffer))
+    ;; from a list of all the pixels to update
+    (for [src-pixel (flatten (map :pixels object-prim-pixels))]
+      (let [w (:width framebuffer)
+            h (:height framebuffer)
+            x (Math/floor (:x src-pixel))
+            y (Math/floor (:y src-pixel))
+            i (int (+ (* y w) x))]
+        [i src-pixel])))))
+
 (defn framebuffer-operations
   "input shaded fragments, write them to the framebuffer"
-  [object-prim-pixels]
-  (doseq [prim-pixels object-prim-pixels]
-    (let [prim (:vertices prim-pixels)
-          pixels (:pixels prim-pixels)]
-      ;; FIXME add different types of blending/depth buffering
-      (doseq [src-pixel pixels]
-        (let [w (:width @framebuffer)
-              h (:height @framebuffer)
-              x (Math/floor (:x src-pixel))
-              y (Math/floor (:y src-pixel))
-              i (int (+ (* y w) x))
-              dest-pixel ((:data @framebuffer) i)]
-          (when (< (:z src-pixel) (:z dest-pixel))
-            (swap! framebuffer
-                   (fn [x]
-                     (into x {:data (assoc (:data x) i src-pixel)}))))))
-      ))
-  object-prim-pixels)
+  [state framebuffer object-prim-pixels]
+  (into framebuffer {:data (framebuffer-operations* state
+                                                    framebuffer
+                                                    object-prim-pixels)}))
 
-(defn draw ;; FIXME better name
+(defn debug-stage
+  [lbl x]
+  (println "======================================================================")
+  (println lbl)
+  (println x)
+  (println "======================================================================")
+  x)
+
+(defn render-framebuffer
   "take in an object, decompose it to triangles, pass them through the
   pipeline and output to framebuffer"
-  [objects]
-  (->> (evaluate objects)
-       (vertex-shader)
-       (project-viewport)
-       (primitive-clip-cull)
-       (rasterize)
-       (pixel-shader)
-       (framebuffer-operations)))
-
-;; ???
-(defn print-ppm
-  []
-  (println "P3" (:width @framebuffer) (:height @framebuffer) 255)
-  (doseq [y (range (:height @framebuffer))]
-    (do
-      (doseq [x (range (:width @framebuffer))]
-        (let [i (int (+ (* y (:width @framebuffer)) x))
-              r (int (Math/floor (+ 0.5 (* 255 (:r ((:data @framebuffer) i))))))
-              g (int (Math/floor (+ 0.5 (* 255 (:g ((:data @framebuffer) i))))))
-              b (int (Math/floor (+ 0.5 (* 255 (:b ((:data @framebuffer) i))))))]
-          (print r g b " ")))
-      (println))))
+  [state framebuffer objects]
+  (->> (evaluate state objects)
+       (vertex-shader state)
+       (project-viewport state)
+       ;;(debug-stage "project-viewport output")
+       (primitive-clip-cull state)
+       (rasterize state)
+       (pixel-shader state)
+       (framebuffer-operations state framebuffer)))
