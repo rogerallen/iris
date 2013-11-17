@@ -1,7 +1,6 @@
 (ns iris.core
   (:require [clojure.pprint :as pp]
-            [iris.geometry :as g]
-            [iris.pipeline :as p])
+            [iris.pipeline :as iris])
   (:gen-class))
 
 ;; TODO
@@ -21,7 +20,7 @@
                              {:x 0.5 :y 0.0 :z 0.5 :r 0.0 :g 1.0 :b 0.0}
                              {:x 0.5 :y 1.0 :z 0.5 :r 0.0 :g 0.0 :b 1.0}
                              ]}]]
-    (p/draw objects)))
+    (iris/draw objects)))
 
 ;;(println (run))
 
@@ -29,4 +28,4 @@
   [& args]
   (let [debug-results (doall (run))]
     ;;(pp/pprint debug-results)
-    (p/print-ppm)))
+    (iris/print-ppm)))
