@@ -2,6 +2,8 @@
   (:require [clojure.core.matrix :as mat]
             [iris.geometry :as g]))
 
+;;(set! *warn-on-reflection* true)
+
 (defn evaluate
   "given an object, evaluate it to decompose it into triangles"
   [state objects]
@@ -102,6 +104,20 @@
               ;; pixels are centered in the middle
               [(+ x 0.5) (+ y 0.5)]))))
 
+(defn in-viewport?
+  [state x y]
+  (and (> x ((:viewport state) 0))
+       (< x (+ ((:viewport state) 0) ((:viewport state) 2)))
+       (> y ((:viewport state) 1))
+       (< y (+ ((:viewport state) 1) ((:viewport state) 3)))))
+
+(defn in-fb?
+  [state x y]
+  (and (> x ((:fbport state) 0))
+       (< x (+ ((:fbport state) 0) ((:fbport state) 2)))
+       (> y ((:fbport state) 1))
+       (< y (+ ((:fbport state) 1) ((:fbport state) 3)))))
+
 (defn rasterize
   "input primitives, output rasterized fragments"
   [state primitives]
@@ -111,21 +127,18 @@
       ;;(println "ra prim" prim)
       {:vertices prim
        :pixels (filter (fn [[x y]]
-                       (and (> x ((:viewport state) 0))
-                            (< x ((:viewport state) 2))
-                            (> y ((:viewport state) 1))
-                            (< y ((:viewport state) 3))))
-                     (rasterize-triangle (:window (nth prim 0))
-                                         (:window (nth prim 1))
-                                         (:window (nth prim 2))))})))
+                         (and (in-viewport? state x y)
+                              (in-fb? state x y)))
+                       (rasterize-triangle (:window (nth prim 0))
+                                           (:window (nth prim 1))
+                                           (:window (nth prim 2))))})))
 ;;(println (run))
 
 (defn triangle-area
   [a b c]
   (let [ab (mat/join (mat/sub b a) [0])
         ac (mat/join (mat/sub c a) [0])
-        aa (mat/cross ab ac)
-        mag (Math/abs (nth aa 2))]
+        mag (mat/length (mat/cross ab ac))]
   (* 0.5 mag)))
 ;; (triangle-area [0 0] [10 0] [10 10])
 
@@ -198,8 +211,8 @@
     (for [src-pixel (flatten (map :pixels object-prim-pixels))]
       (let [w (:width framebuffer)
             h (:height framebuffer)
-            x (Math/floor (:x src-pixel))
-            y (Math/floor (:y src-pixel))
+            x (Math/floor (- (:x src-pixel) ((:fbport state) 0)))
+            y (Math/floor (- (:y src-pixel) ((:fbport state) 1)))
             i (int (+ (* y w) x))]
         [i src-pixel])))))
 
@@ -228,5 +241,6 @@
        ;;(debug-stage "project-viewport output")
        (primitive-clip-cull state)
        (rasterize state)
+       ;;(debug-stage "rasterize output")
        (pixel-shader state)
        (framebuffer-operations state framebuffer)))
