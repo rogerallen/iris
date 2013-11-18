@@ -1,5 +1,5 @@
 (ns iris.pipeline
-  (:require [clojure.core.matrix :as mat]
+  (:require [iris.matrix :as mat]
             [iris.geometry :as g]))
 
 ;;(set! *warn-on-reflection* true)
@@ -22,12 +22,13 @@
         (do
           ;;(println "vertex-shader" v)
           (into v {:clip
-                   (mat/get-column
-                    (mat/mmul (:projection-matrix state)
-                              (:view-matrix state)
-                              (:model-matrix state)
-                              (mat/column-matrix [(:x v) (:y v) (:z v) 1]))
-                    0)})
+                   (mat/mvmul
+                    (mat/mmul
+                     (mat/mmul (:projection-matrix state)
+                               (:view-matrix state))
+                     (:model-matrix state))
+                    [(:x v) (:y v) (:z v) 1])
+                   })
           )))))
 
 (defn project-viewport
@@ -42,7 +43,7 @@
           (let [clip-v (:clip v)
                 ;; ndc = x/w y/w z/w 1/w
                 ndc-v (mat/div
-                       (mat/join (take 3 clip-v) [1])
+                       (concat (take 3 clip-v) [1])
                        (nth clip-v 3))
                 [vox voy px py] (:viewport state)
                 ox       (+ vox (/ px 2))
@@ -71,15 +72,15 @@
 ;; http://www.blackpawn.com/texts/pointinpoly/
 (defn same-side
   [P1 P2 A B]
-  (let [p1 (mat/join P1 [0])
-        p2 (mat/join P2 [0])
-        a  (mat/join A [0])
-        b  (mat/join B [0])
-        cp1 (mat/cross (mat/sub b a) (mat/sub p1 a))
+  (let [p1 (concat P1 [0])
+        p2 (concat P2 [0])
+        a  (concat A [0])
+        b  (concat B [0])
+        cp1 (mat/cross (mat/vsub3 b a) (mat/vsub3 p1 a))
         ;;_ (println cp1)
-        cp2 (mat/cross (mat/sub b a) (mat/sub p2 a))
+        cp2 (mat/cross (mat/vsub3 b a) (mat/vsub3 p2 a))
         ;;_ (println cp2)
-        dp (mat/dot cp1 cp2)]
+        dp (mat/dot3 cp1 cp2)]
         ;;_ (println dp)]
     (>= dp 0)))
 
@@ -136,9 +137,9 @@
 
 (defn triangle-area
   [a b c]
-  (let [ab (mat/join (mat/sub b a) [0])
-        ac (mat/join (mat/sub c a) [0])
-        mag (mat/length (mat/cross ab ac))]
+  (let [ab (concat (mat/vsub2 b a) [0])
+        ac (concat (mat/vsub2 c a) [0])
+        mag (Math/abs (nth (mat/cross ab ac) 2))] ;; we know mag is all in Z comp
   (* 0.5 mag)))
 ;; (triangle-area [0 0] [10 0] [10 10])
 
@@ -149,6 +150,7 @@
         fb (attr (nth prim 1))
         fc (attr (nth prim 2))
         ]
+    ;;(println "intrp" fa fb fc aow bow cow)
     (/ (+ (* fa aow) (* fb bow) (* fc cow))
        (+ (* 1 aow) (* 1 bow) (* 1 cow))))) ;; FIXME for q
 
@@ -236,7 +238,9 @@
   pipeline and output to framebuffer"
   [state framebuffer objects]
   (->> (evaluate state objects)
+       ;;(debug-stage "evaluate output")
        (vertex-shader state)
+       ;;(debug-stage "vertex-shader output")
        (project-viewport state)
        ;;(debug-stage "project-viewport output")
        (primitive-clip-cull state)
