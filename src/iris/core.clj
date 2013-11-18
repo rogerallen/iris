@@ -110,19 +110,19 @@
   (run [0 0 6 6] [0 0 6 6])
 
   ;; repl time tests -- remember to plug laptop in! :^)
-  (time ;; 5.2s
+  (time ;; 3.6s
    (let [fb1 (future (run [0 0 320 320] [0   0 320 320]))]
      (println ((:data @fb1) 10))))
 
   ;; 2 threads
-  (time ;; 4.0s (yay!)
+  (time ;; 3.2s (yay!)
    (let [fb1 (future (run [0 0 320 320] [0   0 320 160]))
          fb2 (future (run [0 0 320 320] [0 160 320 160]))]
      ;(println ((:data @fb1) 10))
      (println ((:data @fb2) 10))))
 
   ;; 4 threads (matching my laptop's 4 real (8 virtual) cores)
-  (time ;; 3.3s with 1 printf (yay!)
+  (time ;; 3.1s
    ;; 3.3 vs 3.7s when matrix routines are not annotated
    (let [fb1 (future (run [0 0 320 320] [0   0 320 80]))
          fb2 (future (run [0 0 320 320] [0  80 320 80]))
@@ -133,7 +133,7 @@
      ;(println ((:data @fb3) 10))
      (println ((:data @fb4) 10))))
 
-  (time ;; 4.7s with one print
+  (time ;; 4.5s
    (let [fb1 (future (run [0 0 320 320] [0   0 320 40]))
          fb2 (future (run [0 0 320 320] [0  40 320 40]))
          fb3 (future (run [0 0 320 320] [0  80 320 40]))

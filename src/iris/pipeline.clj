@@ -139,7 +139,8 @@
   [a b c]
   (let [ab (concat (mat/vsub2 b a) [0])
         ac (concat (mat/vsub2 c a) [0])
-        mag (Math/abs (nth (mat/cross ab ac) 2))] ;; we know mag is all in Z comp
+        ;; wow, the following abs annotation helped significantly
+        mag (Math/abs ^double (nth (mat/cross ab ac) 2))] ;; we know mag is all in Z comp
   (* 0.5 mag)))
 ;; (triangle-area [0 0] [10 0] [10 10])
 
