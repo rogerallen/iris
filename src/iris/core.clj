@@ -5,11 +5,11 @@
   (:gen-class))
 
 ;; TODO
-;; o speed!
 ;; o add more geometry
 ;; o add normals & lighting
 ;; o perspective matrix test
 ;; o texturing
+;; o user vertex/pixel shader functions
 ;; o input scenes
 ;; o output image file
 
@@ -75,12 +75,14 @@
 
 (defn -main
   [& args]
-  ;; each of these seem to take about 25 seconds.  That's dissapointing
+  ;; okay these are now ~10s on plugged in laptop via lein
+  ;; remember to look at "real" not "user" time!
+  ;; actual runtime of test gfx is < 5 seconds
 
   ;;(println (run [0 0 6 6] [0 0 6 6]))
 
   ;; 1 thread
-  (do ;comment
+  (comment
     (print-ppm [(future (run [0 0 320 320] [0   0 320 320]))])
     )
 
@@ -91,7 +93,7 @@
     )
 
   ;; 4 threads
-  (comment
+  (do
     (print-ppm [(future (run [0 0 320 320] [0   0 320 80]))
                 (future (run [0 0 320 320] [0  80 320 80]))
                 (future (run [0 0 320 320] [0 160 320 80]))
@@ -107,30 +109,31 @@
   ;; quick one
   (run [0 0 6 6] [0 0 6 6])
 
-  ;; repl time tests
-  (time ;; 16.8
+  ;; repl time tests -- remember to plug laptop in! :^)
+  (time ;; 5.2s
    (let [fb1 (future (run [0 0 320 320] [0   0 320 320]))]
      (println ((:data @fb1) 10))))
 
   ;; 2 threads
-  (time ;; 16.6s
+  (time ;; 4.0s (yay!)
    (let [fb1 (future (run [0 0 320 320] [0   0 320 160]))
          fb2 (future (run [0 0 320 320] [0 160 320 160]))]
-     (println ((:data @fb1) 10))
+     ;(println ((:data @fb1) 10))
      (println ((:data @fb2) 10))))
 
-  ;; 4 threads
-  (time ;; 19.8s
+  ;; 4 threads (matching my laptop's 4 real (8 virtual) cores)
+  (time ;; 3.3s with 1 printf (yay!)
+   ;; 3.3 vs 3.7s when matrix routines are not annotated
    (let [fb1 (future (run [0 0 320 320] [0   0 320 80]))
          fb2 (future (run [0 0 320 320] [0  80 320 80]))
          fb3 (future (run [0 0 320 320] [0 160 320 80]))
          fb4 (future (run [0 0 320 320] [0 240 320 80]))]
-     (println ((:data @fb1) 10))
-     (println ((:data @fb2) 10))
-     (println ((:data @fb3) 10))
+     ;(println ((:data @fb1) 10))
+     ;(println ((:data @fb2) 10))
+     ;(println ((:data @fb3) 10))
      (println ((:data @fb4) 10))))
 
-  (time ;; 27.6s
+  (time ;; 4.7s with one print
    (let [fb1 (future (run [0 0 320 320] [0   0 320 40]))
          fb2 (future (run [0 0 320 320] [0  40 320 40]))
          fb3 (future (run [0 0 320 320] [0  80 320 40]))
@@ -139,13 +142,13 @@
          fb6 (future (run [0 0 320 320] [0 200 320 40]))
          fb7 (future (run [0 0 320 320] [0 240 320 40]))
          fb8 (future (run [0 0 320 320] [0 280 320 40]))]
-     (println ((:data @fb1) 10))
-     (println ((:data @fb2) 10))
-     (println ((:data @fb3) 10))
-     (println ((:data @fb4) 10))
-     (println ((:data @fb5) 10))
-     (println ((:data @fb6) 10))
-     (println ((:data @fb7) 10))
+     ;(println ((:data @fb1) 10))
+     ;(println ((:data @fb2) 10))
+     ;(println ((:data @fb3) 10))
+     ;(println ((:data @fb4) 10))
+     ;(println ((:data @fb5) 10))
+     ;(println ((:data @fb6) 10))
+     ;(println ((:data @fb7) 10))
      (println ((:data @fb8) 10))))
 
 )
