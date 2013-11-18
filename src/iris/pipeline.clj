@@ -82,7 +82,7 @@
         ;;_ (println cp2)
         dp (mat/dot3 cp1 cp2)]
         ;;_ (println dp)]
-    (>= dp 0)))
+    (>= dp 0.0)))
 
 (defn pt-inside-tri?
   [va vb vc pt]

@@ -80,13 +80,15 @@
   ;;(println (run [0 0 6 6] [0 0 6 6]))
 
   ;; 1 thread
-  (comment
+  (do ;comment
     (print-ppm [(future (run [0 0 320 320] [0   0 320 320]))])
     )
 
   ;; 2 threads
-  (print-ppm [(future (run [0 0 320 320] [0   0 320 160]))
-              (future (run [0 0 320 320] [0 160 320 160]))])
+  (comment
+    (print-ppm [(future (run [0 0 320 320] [0   0 320 160]))
+                (future (run [0 0 320 320] [0 160 320 160]))])
+    )
 
   ;; 4 threads
   (comment
