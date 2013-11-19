@@ -52,12 +52,6 @@
 
 (defn -main
   [& args]
-  ;; okay these are now ~10s on plugged in laptop via lein
-  ;; remember to look at "real" not "user" time!
-  ;; actual runtime of test gfx is < 5 seconds
-
   (util/print-fb-to-ppm (run 4 320 320))
-
   (shutdown-agents) ;; !! important when you use futures !!
-
 )

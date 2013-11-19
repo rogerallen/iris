@@ -18,26 +18,12 @@
             (print r g b " ")))
         (println)))))
 
-(defn print-ppm-header-x
-  "print single ppm header for multiple framebuffers"
-  [framebuffers]
-  (let [iw (:width @(first framebuffers))
-        ih (* (count framebuffers) (:height @(first framebuffers)))]
-    (println "P3" iw ih 255)))
-
 (defn print-ppm-header
   "print single ppm header for multiple framebuffers"
   [framebuffer]
   (let [iw (:width framebuffer)
         ih (:height framebuffer)]
     (println "P3" iw ih 255)))
-
-(defn print-fbs-to-ppm
-  "assume framebuffers are sequential in y"
-  [framebuffers]
-  (print-ppm-header-x framebuffers)
-  (doseq [framebuffer framebuffers]
-    (print-ppm-data @framebuffer)))
 
 (defn print-fb-to-ppm
   "assume framebuffers are sequential in y"
