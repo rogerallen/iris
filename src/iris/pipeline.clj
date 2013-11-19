@@ -227,6 +227,13 @@
                                                     framebuffer
                                                     object-prim-pixels)}))
 
+(defn resolve-framebuffers
+  "combine future-sources into dest framebuffer.  assumes they stack in y"
+  [dest future-sources]
+  (assoc dest :data (apply vector
+                           (apply concat
+                                  (map #(:data @%) future-sources)))))
+
 (defn debug-stage
   [lbl x]
   (println "======================================================================")
@@ -251,3 +258,26 @@
        (pixel-shader state)
        ;;(debug-stage "pixel-shader output")
        (framebuffer-operations state framebuffer)))
+
+(defn parallel-render-framebuffer ;; ??? multimethod?
+  [n state framebuffer objects]
+  (->>
+   (let [w (:width framebuffer)
+         h (:height framebuffer)
+         hon (/ h n)
+         _ (assert (= (rem h n) 0))
+         [fbx fby fbw fbh] (:fbport state)]
+     (for [cur-fby (range 0 h hon)]
+       (future
+         (render-framebuffer
+                (assoc state
+                  :fbport [fbx cur-fby fbw hon])
+                (assoc framebuffer
+                  :y      cur-fby
+                  :height hon
+                  ;; allocate the data for sub-framebuffers
+                  :data   (vec (repeat (* w hon)
+                                       {:r 0 :g 0 :b 0 :z 1}))
+                  )
+                objects))))
+   (resolve-framebuffers framebuffer)))

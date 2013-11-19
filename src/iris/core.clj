@@ -14,8 +14,7 @@
 ;; o input scenes
 ;; o output image file
 
-(defn run [[viewport-x viewport-y viewport-width viewport-height]
-           [framebuffer-x framebuffer-y framebuffer-width framebuffer-height]]
+(defn run [n width height]
   (let [objects [{:type     :triangle-list
                   :vertices [{:x  0.0 :y  0.0 :z 0.0 :r 1.0 :g 0.0 :b 0.0}
                              {:x  1.0 :y -1.0 :z 0.0 :r 0.0 :g 1.0 :b 0.0}
@@ -29,8 +28,8 @@
                              {:x -0.3 :y -1.2 :z 0.25 :r 0.0 :g 1.0 :b 0.0}
                              {:x -0.3 :y  1.2 :z 0.25 :r 0.0 :g 0.0 :b 1.0}
                              ]}]
-        state {:viewport [viewport-x viewport-y viewport-width viewport-height]
-               :fbport [framebuffer-x framebuffer-y framebuffer-width framebuffer-height]
+        state {:viewport [0 0 width height]
+               :fbport [0 0 width height]
                :depth-range [0.0 1.0]
                ;; manipulate via gluLookAt
                :view-matrix (mat/identity-matrix)
@@ -42,15 +41,14 @@
                :projection-matrix (mat/identity-matrix)
                ;; clip-coords = projection * eye-coord
                }
-        framebuffer {:x      framebuffer-x
-                     :y      framebuffer-y
-                     :width  framebuffer-width
-                     :height framebuffer-height
-                     :data   (vec (repeat (* framebuffer-width framebuffer-height)
-                                          {:r 0 :g 0 :b 0 :z 1}))
+        framebuffer {:x      0
+                     :y      0
+                     :width  width
+                     :height height
+                     ;; :data allocated by parallel-render
                      }
         ]
-    (iris/render-framebuffer state framebuffer objects)))
+    (iris/parallel-render-framebuffer n state framebuffer objects)))
 
 (defn -main
   [& args]
@@ -58,76 +56,8 @@
   ;; remember to look at "real" not "user" time!
   ;; actual runtime of test gfx is < 5 seconds
 
-  ;;(println (run [0 0 6 6] [0 0 6 6]))
-
-  ;; 1 thread
-  (comment
-    (util/print-fbs-to-ppm [(future (run [0 0 320 320] [0   0 320 320]))])
-    )
-
-  ;; 2 threads
-  (comment
-    (util/print-fbs-to-ppm [(future (run [0 0 320 320] [0   0 320 160]))
-                (future (run [0 0 320 320] [0 160 320 160]))])
-    )
-
-  ;; 4 threads
-  (do
-    (util/print-fbs-to-ppm [(future (run [0 0 320 320] [0   0 320 80]))
-                (future (run [0 0 320 320] [0  80 320 80]))
-                (future (run [0 0 320 320] [0 160 320 80]))
-                (future (run [0 0 320 320] [0 240 320 80]))])
-    )
+  (util/print-fb-to-ppm (run 4 320 320))
 
   (shutdown-agents) ;; !! important when you use futures !!
-
-)
-
-(comment
-
-  ;; quick one
-  (run [0 0 6 6] [0 0 6 6])
-
-  ;; repl time tests -- remember to plug laptop in! :^)
-  (time ;; 3.6s
-   (let [fb1 (future (run [0 0 320 320] [0   0 320 320]))]
-     (println ((:data @fb1) 10))))
-
-  ;; 2 threads
-  (time ;; 3.2s (yay!)
-   (let [fb1 (future (run [0 0 320 320] [0   0 320 160]))
-         fb2 (future (run [0 0 320 320] [0 160 320 160]))]
-     ;(println ((:data @fb1) 10))
-     (println ((:data @fb2) 10))))
-
-  ;; 4 threads (matching my laptop's 4 real (8 virtual) cores)
-  (time ;; 3.1s
-   ;; 3.3 vs 3.7s when matrix routines are not annotated
-   (let [fb1 (future (run [0 0 320 320] [0   0 320 80]))
-         fb2 (future (run [0 0 320 320] [0  80 320 80]))
-         fb3 (future (run [0 0 320 320] [0 160 320 80]))
-         fb4 (future (run [0 0 320 320] [0 240 320 80]))]
-     ;(println ((:data @fb1) 10))
-     ;(println ((:data @fb2) 10))
-     ;(println ((:data @fb3) 10))
-     (println ((:data @fb4) 10))))
-
-  (time ;; 4.5s
-   (let [fb1 (future (run [0 0 320 320] [0   0 320 40]))
-         fb2 (future (run [0 0 320 320] [0  40 320 40]))
-         fb3 (future (run [0 0 320 320] [0  80 320 40]))
-         fb4 (future (run [0 0 320 320] [0 120 320 40]))
-         fb5 (future (run [0 0 320 320] [0 160 320 40]))
-         fb6 (future (run [0 0 320 320] [0 200 320 40]))
-         fb7 (future (run [0 0 320 320] [0 240 320 40]))
-         fb8 (future (run [0 0 320 320] [0 280 320 40]))]
-     ;(println ((:data @fb1) 10))
-     ;(println ((:data @fb2) 10))
-     ;(println ((:data @fb3) 10))
-     ;(println ((:data @fb4) 10))
-     ;(println ((:data @fb5) 10))
-     ;(println ((:data @fb6) 10))
-     ;(println ((:data @fb7) 10))
-     (println ((:data @fb8) 10))))
 
 )
