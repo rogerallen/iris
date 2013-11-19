@@ -1,7 +1,8 @@
 (ns iris.core
   (:require [clojure.pprint :as pp]
             [iris.matrix :as mat]
-            [iris.pipeline :as iris])
+            [iris.pipeline :as iris]
+            [iris.util :as util])
   (:gen-class))
 
 ;; TODO
@@ -12,28 +13,6 @@
 ;; o user vertex/pixel shader functions
 ;; o input scenes
 ;; o output image file
-
-(defn round255 [x]
-  (int (Math/floor (+ 0.5 (* 255 x)))))
-
-(defn print-ppm
-  "assume framebuffers are sequential in y"
-  [framebuffers]
-  (let [iw (:width @(first framebuffers))
-        ih (* (count framebuffers) (:height @(first framebuffers)))]
-    (println "P3" iw ih 255)
-    (doseq [framebuffer framebuffers]
-      (let [w (:width @framebuffer)
-            h (:height @framebuffer)]
-        (doseq [y (range h)]
-          (do
-            (doseq [x (range w)]
-              (let [i (int (+ (* y w) x))
-                    r (round255 (:r ((:data @framebuffer) i)))
-                    g (round255 (:g ((:data @framebuffer) i)))
-                    b (round255 (:b ((:data @framebuffer) i)))]
-                (print r g b " ")))
-            (println)))))))
 
 (defn run [[viewport-x viewport-y viewport-width viewport-height]
            [framebuffer-x framebuffer-y framebuffer-width framebuffer-height]]
@@ -83,18 +62,18 @@
 
   ;; 1 thread
   (comment
-    (print-ppm [(future (run [0 0 320 320] [0   0 320 320]))])
+    (util/print-fbs-to-ppm [(future (run [0 0 320 320] [0   0 320 320]))])
     )
 
   ;; 2 threads
   (comment
-    (print-ppm [(future (run [0 0 320 320] [0   0 320 160]))
+    (util/print-fbs-to-ppm [(future (run [0 0 320 320] [0   0 320 160]))
                 (future (run [0 0 320 320] [0 160 320 160]))])
     )
 
   ;; 4 threads
   (do
-    (print-ppm [(future (run [0 0 320 320] [0   0 320 80]))
+    (util/print-fbs-to-ppm [(future (run [0 0 320 320] [0   0 320 80]))
                 (future (run [0 0 320 320] [0  80 320 80]))
                 (future (run [0 0 320 320] [0 160 320 80]))
                 (future (run [0 0 320 320] [0 240 320 80]))])
