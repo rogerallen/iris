@@ -1,18 +1,17 @@
 (ns iris.core
   (:require [clojure.pprint :as pp]
+            [clojure.edn :as edn]
             [iris.matrix :as mat]
             [iris.pipeline :as iris]
             [iris.util :as util])
   (:gen-class))
 
 ;; TODO
-;; o add more geometry
+;; o add more geometry (box, sphere)
 ;; o add normals & lighting
 ;; o perspective matrix test
-;; o texturing
 ;; o user vertex/pixel shader functions
-;; o input scenes
-;; o output image file
+;; o texturing
 
 (defn run [n width height]
   (let [objects [{:type     :triangle-list
@@ -52,6 +51,22 @@
 
 (defn -main
   [& args]
-  (util/print-fb-to-ppm (run 4 320 320))
+  (if (= 1 (count args))
+    ;; read config from edn file
+    (let [edn-file    (first args)
+          _           (binding [*out* *err*]
+                        (println "Rendering from" edn-file))
+          config      (edn/read-string (slurp edn-file))
+          ;;_ (pp/pprint config)
+          n           (:parallelism config)
+          state       (:state config)
+          framebuffer (:framebuffer config)
+          objects     (:objects config)]
+      (util/print-fb-to-ppm
+       (iris/parallel-render-framebuffer n state framebuffer objects))
+      (binding [*out* *err*]
+        (println "done")))
+    ;; else we have a pre-canned version of example1.edn
+    (util/print-fb-to-ppm (run 4 320 320)))
   (shutdown-agents) ;; !! important when you use futures !!
 )
