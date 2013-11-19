@@ -1,36 +1,22 @@
 # iris
 
-FIXME: description
-
-## Installation
-
-Download from http://example.com/FIXME.
+Iris is a graphics pipeline implemented in clojure for educational
+purposes.  Others may find this useful for understanding a basic
+OpenGL-like graphics pipeline.  I've used it to learn about
+programming in Clojure and taking advantage of lazy sequences and
+futures.
 
 ## Usage
 
-FIXME: explanation
+`lein run configfile.edn` will output a ppm file to stdout based on
+the configfile.edn.  See `doc/example1.edn` for the format.
 
-    $ java -jar iris-0.1.0-standalone.jar [args]
-
-## Options
-
-FIXME: listing of options this app accepts.
-
-## Examples
-
-...
-
-### Bugs
-
-...
-
-### Any Other Sections
-### That You Think
-### Might be Useful
+Start with `render-framebuffer` in `src/iris/pipeline.clj` and follow
+the rendering...
 
 ## License
 
-Copyright © 2013 FIXME
+Copyright © 2013 Roger Allen
 
 Distributed under the Eclipse Public License either version 1.0 or (at
 your option) any later version.
