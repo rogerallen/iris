@@ -216,6 +216,7 @@
             h (:height framebuffer)
             x (Math/floor (- (:x src-pixel) ((:fbport state) 0)))
             y (Math/floor (- (:y src-pixel) ((:fbport state) 1)))
+            ;;_ (println "fb" x y)
             i (int (+ (* y w) x))]
         [i src-pixel])))))
 
@@ -248,4 +249,5 @@
        (rasterize state)
        ;;(debug-stage "rasterize output")
        (pixel-shader state)
+       ;;(debug-stage "pixel-shader output")
        (framebuffer-operations state framebuffer)))
