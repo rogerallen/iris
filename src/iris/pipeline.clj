@@ -121,18 +121,20 @@
 
 (defn rasterize
   "input primitives, output rasterized fragments"
-  [state primitives]
-  ;;(println "ra prims" primitives)
-  (for [prim (first primitives)] ;; FIXME
+  [state object-primitives]
+  (for [primitives object-primitives]
     (do
-      ;;(println "ra prim" prim)
-      {:vertices prim
-       :pixels (filter (fn [[x y]]
-                         (and (in-viewport? state x y)
-                              (in-fb? state x y)))
-                       (rasterize-triangle (:window (nth prim 0))
-                                           (:window (nth prim 1))
-                                           (:window (nth prim 2))))})))
+      ;;(println "prims" primitives)
+      (for [prim primitives]
+        (do
+          ;;(println "prim" prim)
+          {:vertices prim
+           :pixels (filter (fn [[x y]]
+                             (and (in-viewport? state x y)
+                                  (in-fb? state x y)))
+                           (rasterize-triangle (:window (nth prim 0))
+                                               (:window (nth prim 1))
+                                               (:window (nth prim 2))))})))))
 ;;(println (run))
 
 (defn triangle-area
@@ -185,19 +187,20 @@
 
 (defn pixel-shader
   "input unshaded pixels, output shaded pixels"
-  [state object-prim-pixels]
+  [state objects-prims-pixels]
   ;;(println "PS" object-prim-pixels)
-  (for [prim-pixels object-prim-pixels]
-    (let [prim (:vertices prim-pixels)
-          pixels (:pixels prim-pixels)]
-      ;;(println "prim-pixels" prim pixels)
-      {:vertices prim
-       :pixels (for [p pixels]
-                  (let [x (first p)
-                        y (second p)]
-                    ;;(println "pixel-shader" x y)
-                    (into {:x x :y y} (shade-pixel prim x y))))}
-      )))
+  (for [prims-pixels objects-prims-pixels]
+    (for [prim-pixels prims-pixels]
+      (let [prim (:vertices prim-pixels)
+            pixels (:pixels prim-pixels)]
+        ;;(println "prim-pixels" prim )
+        {:vertices prim
+         :pixels (for [p pixels]
+                   (let [x (first p)
+                         y (second p)]
+                     ;;(println "pixel-shader" x y)
+                     (into {:x x :y y} (shade-pixel prim x y))))}
+        ))))
 
 (defn framebuffer-operations*
   [state framebuffer object-prim-pixels]
@@ -211,7 +214,7 @@
           fb)))
     (transient (:data framebuffer))
     ;; from a list of all the pixels to update
-    (for [src-pixel (flatten (map :pixels object-prim-pixels))]
+    (for [src-pixel (flatten (map #(map :pixels %) object-prim-pixels))]
       (let [w (:width framebuffer)
             h (:height framebuffer)
             x (Math/floor (- (:x src-pixel) ((:fbport state) 0)))
@@ -236,10 +239,11 @@
 
 (defn debug-stage
   [lbl x]
-  (println "======================================================================")
-  (println lbl)
-  (println x)
-  (println "======================================================================")
+  (binding [*out* *err*]
+    (println "======================================================================")
+    (println lbl)
+    (println x)
+    (println "======================================================================"))
   x)
 
 (defn render-framebuffer
@@ -253,6 +257,7 @@
        (project-viewport state)
        ;;(debug-stage "project-viewport output")
        (primitive-clip-cull state)
+       ;;(debug-stage "clip-cull output")
        (rasterize state)
        ;;(debug-stage "rasterize output")
        (pixel-shader state)

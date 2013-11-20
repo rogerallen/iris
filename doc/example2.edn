@@ -1,0 +1,59 @@
+{:parallelism 4
+ :objects [{:type   :cube
+            :center [0.0 0.0 0.8]
+            :x-size 0.3
+            :y-size 0.3
+            :z-size 0.3
+            :color  {:r 0.5 :g 0.9 :b 0.8}
+            }
+           {:type   :cube
+            :center [0.0 0.5 0.5]
+            :x-size 0.1
+            :y-size 0.2
+            :z-size 0.1
+            :color  {:r 0.9 :g 0.5 :b 0.8}
+            }
+           {:type   :cube
+            :center [0.0 -0.5 0.5]
+            :x-size 0.2
+            :y-size 0.1
+            :z-size 0.1
+            :color  {:r 0.9 :g 0.8 :b 0.5}
+            }
+           {:type   :cube
+            :center [0.5 0.0 0.5]
+            :x-size 0.1
+            :y-size 0.1
+            :z-size 0.2
+            :color  {:r 0.8 :g 0.5 :b 0.9}
+            }
+           {:type   :cube
+            :center [-0.5 0.0 0.5]
+            :x-size 0.1
+            :y-size 0.1
+            :z-size 0.1
+            :color  {:r 0.8 :g 0.9 :b 0.5}
+            }
+           ]
+ :state {:viewport          [0 0 320 320]
+         :fbport            [0 0 320 320]
+         :depth-range       [0.0 1.0]
+         :model-matrix      [1.0 0.0 0.0 0.0
+                             0.0 1.0 0.0 0.0
+                             0.0 0.0 1.0 0.0
+                             0.0 0.0 0.0 1.0]
+         :view-matrix       [1.0 0.0 0.0 0.0
+                             0.0 1.0 0.0 0.0
+                             0.0 0.0 1.0 0.0
+                             0.0 0.0 0.0 1.0]
+         :projection-matrix [1.0 0.0 0.0 0.0
+                             0.0 1.0 0.0 0.0
+                             0.0 0.0 1.0 0.0
+                             0.0 0.0 0.0 1.0]
+         }
+ :framebuffer {:x      0
+               :y      0
+               :width  320
+               :height 320
+               }
+}
