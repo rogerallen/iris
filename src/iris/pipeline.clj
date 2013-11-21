@@ -22,11 +22,13 @@
         (do
           ;;(println "vertex-shader" v)
           (into v {:clip
+                   ;; v-clip = MVP * v
                    (mat/mvmul
-                    (mat/mmul
-                     (mat/mmul (:projection-matrix state)
-                               (:view-matrix state))
-                     (:model-matrix state))
+                    ;; MVP = P * MV
+                    (mat/mmul (:projection-matrix state)
+                              ;; MV = V * M
+                              (mat/mmul (:view-matrix state)
+                                        (:model-matrix state)))
                     [(:x v) (:y v) (:z v) 1])
                    })
           )))))
@@ -255,7 +257,7 @@
        (vertex-shader state)
        ;;(debug-stage "vertex-shader output")
        (project-viewport state)
-       ;;(debug-stage "project-viewport output")
+       (debug-stage "project-viewport output")
        (primitive-clip-cull state)
        ;;(debug-stage "clip-cull output")
        (rasterize state)
@@ -282,7 +284,7 @@
                   :height hon
                   ;; allocate the data for sub-framebuffers
                   :data   (vec (repeat (* w hon)
-                                       {:r 0 :g 0 :b 0 :z 1}))
+                                       {:r 0 :g 0 :b 0 :z 1000}))
                   )
                 objects))))
    (resolve-framebuffers framebuffer)))
