@@ -257,7 +257,7 @@
        (vertex-shader state)
        ;;(debug-stage "vertex-shader output")
        (project-viewport state)
-       (debug-stage "project-viewport output")
+       ;;(debug-stage "project-viewport output")
        (primitive-clip-cull state)
        ;;(debug-stage "clip-cull output")
        (rasterize state)
