@@ -1,10 +1,9 @@
-# iris
+# Iris
 
-Iris is a graphics pipeline implemented in Clojure for educational
-purposes.  Others may find this useful for understanding a basic
-OpenGL-like graphics pipeline.  I've used it to learn about
-programming in Clojure and taking advantage of lazy sequences and
-futures.
+Iris is a OpenGL-like graphics pipeline implemented in Clojure for
+educational purposes.  Others may find this useful for understanding a
+basic graphics pipeline.  I've used it to learn about programming in
+Clojure and taking advantage of lazy sequences and futures.
 
 ## Usage
 
