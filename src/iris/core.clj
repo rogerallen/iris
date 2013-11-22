@@ -7,9 +7,7 @@
   (:gen-class))
 
 ;; TODO
-;; o add more geometry (box, sphere)
 ;; o add normals & lighting
-;; o perspective matrix test
 ;; o user vertex/pixel shader functions
 ;; o texturing
 

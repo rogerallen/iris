@@ -168,6 +168,43 @@
                 0.0             0.0             0.0             1.0]
                (vmuls eye -1.0))))
 
+(defn ortho
+  [left right bottom top near far]
+  (let [tx (- (/ (+ right left) (- right left)))
+        ty (- (/ (+ top bottom) (- top bottom)))
+        tz (- (/ (+ far near) (- far near)))
+        sx (/ 2.0 (- right left))
+        sy (/ 2.0 (- top bottom))
+        sz (/ 2.0 (- far near))]
+    [sx 0  0  tx
+     0  sy 0  ty
+     0  0  sz tz
+     0  0  0  1]))
+
+(defn frustum
+  [left right bottom top near far]
+  (let [A (/ (+ right left) (- right left))
+        B (/ (+ top bottom) (- top bottom))
+        C (- (/ (+ far near) (- far near)))
+        D (- (/ (* 2 far near) (- far near)))
+        E (/ (* 2 far near) (- right left))
+        F (/ (* 2 far near) (- top bottom))]
+    [E 0  A 0
+     0 F  B 0
+     0 0  C D
+     0 0 -1 0]))
+
+(defn perspective
+  [fov-y aspect near far]
+  (let [f (/ (Math/cos (/ fov-y 2.0)) (Math/sin (/ fov-y 2.0))) ; cotangent
+        C (- (/ (+ far near) (- far near)))
+        D (- (/ (* 2 far near) (- far near)))
+        F (/ f aspect)]
+    [F 0  0 0
+     0 f  0 0
+     0 0  C D
+     0 0 -1 0]))
+
 (defn mpr [[m00 m01 m02 m03
             m10 m11 m12 m13
             m20 m21 m22 m23
