@@ -10,6 +10,24 @@
   (for [o objects]
     (g/evaluate-object o)))
 
+(defn vertex-light
+  [state v]
+  (if (contains? state :light-vector)
+    (let [clip-n (mat/mvmul
+                  (mat/mmul (:projection-matrix state)
+                            (mat/mmul (:view-matrix state)
+                                      (:model-matrix state)))
+                      [(:nx v) (:ny v) (:nz v) 0])
+          clip-n (mat/vnorm clip-n)
+          n-dot-l (max 0 (mat/dot3 clip-n (:light-vector state)))]
+      ;; a little ambient + diffuse shader
+      {:r (min 1.0 (+ (* 0.2 (:r v)) (* n-dot-l (:r v))))
+       :g (min 1.0 (+ (* 0.2 (:g v)) (* n-dot-l (:g v))))
+       :b (min 1.0 (+ (* 0.2 (:b v)) (* n-dot-l (:b v))))}
+      )
+    ;; else
+    {:r (:r v) :g (:g v) :b (:b v)}))
+
 ;; (partial vertex-shader your-vs) ??
 (defn vertex-shader
   "input world-space vertices, output projected clip-coord vertices"
@@ -19,17 +37,20 @@
     (do
       ;;(println "O" o)
       (for [v vertices]
-        (do
+        (let [clip-v (mat/mvmul ;; v-clip = MVP * v
+                      ;; MVP = P * MV
+                      (mat/mmul (:projection-matrix state)
+                                ;; MV = V * M
+                                (mat/mmul (:view-matrix state)
+                                          (:model-matrix state)))
+                      [(:x v) (:y v) (:z v) 1])
+              rgb-v (vertex-light state v)
+              ]
           ;;(println "vertex-shader" v)
-          (into v {:clip
-                   ;; v-clip = MVP * v
-                   (mat/mvmul
-                    ;; MVP = P * MV
-                    (mat/mmul (:projection-matrix state)
-                              ;; MV = V * M
-                              (mat/mmul (:view-matrix state)
-                                        (:model-matrix state)))
-                    [(:x v) (:y v) (:z v) 1])
+          (into v {:clip clip-v
+                   :r (:r rgb-v)
+                   :g (:g rgb-v)
+                   :b (:b rgb-v)
                    })
           )))))
 

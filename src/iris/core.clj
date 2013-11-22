@@ -7,7 +7,6 @@
   (:gen-class))
 
 ;; TODO
-;; o add normals & lighting
 ;; o user vertex/pixel shader functions
 ;; o texturing
 
