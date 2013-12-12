@@ -117,11 +117,23 @@
          (same-side pt C A B))))
 
 (defn rasterize-triangle
-  [va vb vc]
+  [state va vb vc]
   (let [x-min (min (va 0) (vb 0) (vc 0))
+        x-min (max x-min
+                   ((:fbport state) 0)
+                   ((:viewport state) 0))
         x-max (max (va 0) (vb 0) (vc 0))
+        x-max (min x-max
+                   (dec (+ ((:fbport state) 0) ((:fbport state) 2)))
+                   (dec (+ ((:viewport state) 0) ((:viewport state) 2))))
         y-min (min (va 1) (vb 1) (vc 1))
-        y-max (max (va 1) (vb 1) (vc 1))]
+        y-min (max y-min
+                   ((:fbport state) 1)
+                   ((:viewport state) 1))
+        y-max (max (va 1) (vb 1) (vc 1))
+        y-max (min y-max
+                   (dec (+ ((:fbport state) 1) ((:fbport state) 3)))
+                   (dec (+ ((:viewport state) 1) ((:viewport state) 3))))]
     (filter #(pt-inside-tri? va vb vc %)
             (for [x (range x-min x-max)
                   y (range y-min y-max)]
@@ -130,16 +142,16 @@
 
 (defn in-viewport?
   [state x y]
-  (and (> x ((:viewport state) 0))
+  (and (>= x ((:viewport state) 0))
        (< x (+ ((:viewport state) 0) ((:viewport state) 2)))
-       (> y ((:viewport state) 1))
+       (>= y ((:viewport state) 1))
        (< y (+ ((:viewport state) 1) ((:viewport state) 3)))))
 
 (defn in-fb?
   [state x y]
-  (and (> x ((:fbport state) 0))
+  (and (>= x ((:fbport state) 0))
        (< x (+ ((:fbport state) 0) ((:fbport state) 2)))
-       (> y ((:fbport state) 1))
+       (>= y ((:fbport state) 1))
        (< y (+ ((:fbport state) 1) ((:fbport state) 3)))))
 
 (defn rasterize
@@ -152,12 +164,10 @@
         (do
           ;;(println "prim" prim)
           {:vertices prim
-           :pixels (filter (fn [[x y]]
-                             (and (in-viewport? state x y)
-                                  (in-fb? state x y)))
-                           (rasterize-triangle (:window (nth prim 0))
-                                               (:window (nth prim 1))
-                                               (:window (nth prim 2))))})))))
+           :pixels (rasterize-triangle state
+                                       (:window (nth prim 0))
+                                       (:window (nth prim 1))
+                                       (:window (nth prim 2)))})))))
 ;;(println (run))
 
 (defn triangle-area
@@ -231,7 +241,9 @@
    (reduce
     ;; reduce into a transient copy of the framebuffer
     (fn [fb [i src-pixel]]
-      (let [dest-pixel (nth fb i)]
+      (let [;;_ (println "fb  i" i)
+            ;;_ (when (> i (count fb)) (println "OUT OF RANGE" i))
+            dest-pixel (nth fb i)]
         (if (< (:z src-pixel) (:z dest-pixel))
           (assoc! fb i src-pixel)
           fb)))
@@ -242,7 +254,7 @@
             h (:height framebuffer)
             x (Math/floor (- (:x src-pixel) ((:fbport state) 0)))
             y (Math/floor (- (:y src-pixel) ((:fbport state) 1)))
-            ;;_ (println "fb" x y)
+            ;;_ (println "fb xy" x y)
             i (int (+ (* y w) x))]
         [i src-pixel])))))
 
@@ -292,8 +304,8 @@
   (->>
    (let [w (:width framebuffer)
          h (:height framebuffer)
-         hon (/ h n)
-         _ (assert (= (rem h n) 0))
+         hon (int (/ h n))
+         _ (assert (== (rem h n) 0))
          [fbx fby fbw fbh] (:fbport state)]
      (for [cur-fby (range 0 h hon)]
        (future
