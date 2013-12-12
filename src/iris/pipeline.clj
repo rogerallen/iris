@@ -116,30 +116,6 @@
          (same-side pt B A C)
          (same-side pt C A B))))
 
-(defn rasterize-triangle
-  [state va vb vc]
-  (let [x-min (min (va 0) (vb 0) (vc 0))
-        x-min (max x-min
-                   ((:fbport state) 0)
-                   ((:viewport state) 0))
-        x-max (max (va 0) (vb 0) (vc 0))
-        x-max (min x-max
-                   (dec (+ ((:fbport state) 0) ((:fbport state) 2)))
-                   (dec (+ ((:viewport state) 0) ((:viewport state) 2))))
-        y-min (min (va 1) (vb 1) (vc 1))
-        y-min (max y-min
-                   ((:fbport state) 1)
-                   ((:viewport state) 1))
-        y-max (max (va 1) (vb 1) (vc 1))
-        y-max (min y-max
-                   (dec (+ ((:fbport state) 1) ((:fbport state) 3)))
-                   (dec (+ ((:viewport state) 1) ((:viewport state) 3))))]
-    (filter #(pt-inside-tri? va vb vc %)
-            (for [x (range x-min x-max)
-                  y (range y-min y-max)]
-              ;; pixels are centered in the middle
-              [(+ x 0.5) (+ y 0.5)]))))
-
 (defn in-viewport?
   [state x y]
   (and (>= x ((:viewport state) 0))
@@ -153,6 +129,21 @@
        (< x (+ ((:fbport state) 0) ((:fbport state) 2)))
        (>= y ((:fbport state) 1))
        (< y (+ ((:fbport state) 1) ((:fbport state) 3)))))
+
+(defn rasterize-triangle
+  [state va vb vc]
+  (let [x-min (Math/floor (min (va 0) (vb 0) (vc 0)))
+        x-max (Math/ceil (max (va 0) (vb 0) (vc 0)))
+        y-min (Math/floor (min (va 1) (vb 1) (vc 1)))
+        y-max (Math/ceil (max (va 1) (vb 1) (vc 1)))]
+    (filter (fn [[x y]] (and (in-fb? state x y)
+                            (in-viewport? state x y)
+                            (pt-inside-tri? va vb vc [x y])))
+            ;; Be careful: (range 1.2 3.7) ==> (1.2 2.2 3.2).  Use floor/ceil
+            (for [x (range x-min x-max)
+                  y (range y-min y-max)]
+              ;; pixels are centered in the middle
+              [(+ x 0.5) (+ y 0.5)]))))
 
 (defn rasterize
   "input primitives, output rasterized fragments"

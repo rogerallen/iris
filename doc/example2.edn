@@ -1,4 +1,4 @@
-{:parallelism 1
+{:parallelism 4
  :objects [{:type   :cube
             :center [0.0 0.0 0.0]
             :x-size 0.3
