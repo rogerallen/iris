@@ -28,31 +28,32 @@
     ;; else
     {:r (:r v) :g (:g v) :b (:b v)}))
 
-;; (partial vertex-shader your-vs) ??
-(defn vertex-shader
+(defn shade-vertex
+  [state v]
+  (let [clip-v (mat/mvmul ;; v-clip = MVP * v
+                ;; MVP = P * MV
+                (mat/mmul (:projection-matrix state)
+                          ;; MV = V * M
+                          (mat/mmul (:view-matrix state)
+                                    (:model-matrix state)))
+                [(:x v) (:y v) (:z v) 1])
+        rgb-v (vertex-light state v)
+        ]
+    ;;(println "shade-vertices" v)
+    (into v {:clip clip-v
+             :r (:r rgb-v)
+             :g (:g rgb-v)
+             :b (:b rgb-v)
+             })))
+
+;; (partial shade-vertices your-vs) ??
+(defn shade-vertices
   "input world-space vertices, output projected clip-coord vertices"
   [state object-vertices]
   ;;(println "VS" object-vertices)
   (for [vertices object-vertices]
-    (do
-      ;;(println "O" o)
-      (for [v vertices]
-        (let [clip-v (mat/mvmul ;; v-clip = MVP * v
-                      ;; MVP = P * MV
-                      (mat/mmul (:projection-matrix state)
-                                ;; MV = V * M
-                                (mat/mmul (:view-matrix state)
-                                          (:model-matrix state)))
-                      [(:x v) (:y v) (:z v) 1])
-              rgb-v (vertex-light state v)
-              ]
-          ;;(println "vertex-shader" v)
-          (into v {:clip clip-v
-                   :r (:r rgb-v)
-                   :g (:g rgb-v)
-                   :b (:b rgb-v)
-                   })
-          )))))
+    (for [v vertices]
+      (shade-vertex state v))))
 
 (defn project-viewport
   "input vertices in clip-coords, output processed primitives in
@@ -209,7 +210,7 @@
     {:x x :y y :z z :r r :g g :b b}))
 
 
-(defn pixel-shader
+(defn shade-pixels
   "input unshaded pixels, output shaded pixels"
   [state objects-prims-pixels]
   ;;(println "PS" object-prim-pixels)
@@ -222,7 +223,7 @@
          :pixels (for [p pixels]
                    (let [x (first p)
                          y (second p)]
-                     ;;(println "pixel-shader" x y)
+                     ;;(println "shade-pixels" x y)
                      (into {:x x :y y} (shade-pixel prim x y))))}
         ))))
 
@@ -278,16 +279,16 @@
   [state framebuffer objects]
   (->> (evaluate state objects)
        ;;(debug-stage "evaluate output")
-       (vertex-shader state)
-       ;;(debug-stage "vertex-shader output")
+       (shade-vertices state)
+       ;;(debug-stage "shade-vertices output")
        (project-viewport state)
        ;;(debug-stage "project-viewport output")
        (primitive-clip-cull state)
        ;;(debug-stage "clip-cull output")
        (rasterize state)
        ;;(debug-stage "rasterize output")
-       (pixel-shader state)
-       ;;(debug-stage "pixel-shader output")
+       (shade-pixels state)
+       ;;(debug-stage "shade-pixels output")
        (framebuffer-operations state framebuffer)))
 
 (defn parallel-render-framebuffer ;; ??? multimethod?
