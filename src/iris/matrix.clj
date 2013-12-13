@@ -1,6 +1,10 @@
 (ns iris.matrix)
+;; a hand-made matrix library only suitable for use in a self-contained project like this.
+;; this is NOT trying to be a "real" library.
 
-(defn identity-matrix []
+(defn identity-matrix
+  "return a 4x4 identity matrix"
+  []
   [1.0 0.0 0.0 0.0
    0.0 1.0 0.0 0.0
    0.0 0.0 1.0 0.0
@@ -53,6 +57,7 @@
 ;; (mvmul (identity-matrix) [1 2 3 4])
 
 (defn vmuls
+  "3d vector times scalar"
   ^doubles [^doubles [x y z] ^double s]
   [(* x s) (* y s) (* z s)])
 
@@ -79,11 +84,13 @@
 ;; ??? if I put ^doubles on the return, this gives a error
 ;; cannot be cast to clojure.lang.IFn
 (defn dot3
+  "3d vector dot product"
   [^doubles [u0 u1 u2]
    ^doubles [v0 v1 v2]]
   (+ (* u0 v0) (* u1 v1) (* u2 v2)))
 
 (defn div3
+  "3d vector divided by scalar"
   ^doubles [^doubles [u0 u1 u2]
             ^double v]
   [(/ u0 v)
@@ -91,6 +98,7 @@
    (/ u2 v)])
 
 (defn div ;; FIXME?
+  "4d vector devided by scalar"
   ^doubles [^doubles [u0 u1 u2 u3]
             ^double v]
   [(/ u0 v)
@@ -99,10 +107,12 @@
    (/ u3 v)])
 
 (defn vmag ;; cannot add ^double to return ??? FIXME
+  "3d vector magnitude"
   [[^double x ^double y ^double z]]
   (Math/sqrt (+ (* x x) (* y y) (* z z))))
 
 (defn vnorm
+  "3d vector normalization"
   ^doubles [^doubles u]
   (let [mag (vmag u)]
     (if (= mag 1.0)
@@ -111,7 +121,7 @@
         [0.0 0.0 0.0]
         (div3 u mag)))))
 
-;; NOTE! OpenGL assumes Column Major Matrices in memory.  The above
+;; NOTE: OpenGL assumes Column Major Matrices in memory.  The above
 ;; math is all in Row Major.  So, keep this guide in mind when
 ;; interpreting OpenGL code that accesses a matrix in memory.
 ;;
@@ -121,6 +131,7 @@
 ;;   m04 m08 m12 m16 ]
 
 (defn translate
+  "translate 4x4 matrix by 3d vector, returning new matrix"
   ^doubles [^doubles m ^doubles[x y z]]
   (mmul m
         [1 0 0 x
@@ -129,6 +140,7 @@
          0 0 0 1]))
 
 (defn rotate
+  "rotate 4x4 matrix by angle radians about a 3d vector, returning new matrix"
   ^doubles [^doubles m ^double angle ^doubles [x y z]]
   (let [c       (Math/cos angle)
         l-c     (- 1.0 c)
@@ -147,6 +159,7 @@
           )))
 
 (defn scale
+  "scale 4x4 matrix by 3d vector, returning new matrix"
   ^doubles [^doubles m ^doubles[x y z]]
   (mmul m
         [x 0 0 0
@@ -155,8 +168,10 @@
          0 0 0 1]))
 
 (defn look-at
-  "return a view matrix"
-  ^doubles [^doubles eye ^doubles center ^doubles upv]
+  "return a 4x4 view matrix from eye 3d vector, to center 3d vector
+  with upv 3d vector indicating the 'up' direction."
+  ^doubles
+  [^doubles eye ^doubles center ^doubles upv]
   (let [upv     (vnorm upv)
         forward (vnorm (vsub3 center eye))
         side    (vnorm (cross forward upv))
@@ -169,6 +184,7 @@
                (vmuls eye -1.0))))
 
 (defn ortho
+  "return 4x4 orthographic projection matrix"
   [left right bottom top near far]
   (let [tx (- (/ (+ right left) (- right left)))
         ty (- (/ (+ top bottom) (- top bottom)))
@@ -182,6 +198,7 @@
      0  0  0  1]))
 
 (defn frustum
+  "return 4x4 perspective projection matrix"
   [left right bottom top near far]
   (let [A (/ (+ right left) (- right left))
         B (/ (+ top bottom) (- top bottom))
@@ -195,6 +212,7 @@
      0 0 -1 0]))
 
 (defn perspective
+  "return 4x4 perspective projection matrix"
   [fov-y aspect near far]
   (let [f (/ (Math/cos (/ fov-y 2.0)) (Math/sin (/ fov-y 2.0))) ; cotangent
         C (- (/ (+ far near) (- far near)))
@@ -205,10 +223,12 @@
      0 0  C D
      0 0 -1 0]))
 
-(defn mpr [[m00 m01 m02 m03
-            m10 m11 m12 m13
-            m20 m21 m22 m23
-            m30 m31 m32 m33]]
+(defn mpr
+  "print 4x4 matrix for debug"
+  [[m00 m01 m02 m03
+    m10 m11 m12 m13
+    m20 m21 m22 m23
+    m30 m31 m32 m33]]
   (println "[" m00 m01 m02 m03)
   (println " " m10 m11 m12 m13)
   (println " " m20 m21 m22 m23)
