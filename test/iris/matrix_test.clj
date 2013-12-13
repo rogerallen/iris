@@ -2,6 +2,8 @@
   (:require [clojure.test :refer :all]
             [iris.matrix :as mat]))
 
+;; testing is way too skimpy...FIXME
+
 (deftest matrix-1
   (testing "identity-matrix"
     (is (= (mat/identity-matrix)
