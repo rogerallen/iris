@@ -4,15 +4,12 @@
 
 ;;(set! *warn-on-reflection* true)
 
-(defn evaluate
-  "given an object, evaluate it to decompose it into triangles"
-  [state objects]
-  (for [o objects]
-    (g/evaluate-object o)))
-
+;; ======================================================================
+;; vertex shader helper routines
 (defn vertex-light
   [state v]
   (if (contains? state :light-vector)
+    ;; a little ambient + diffuse shader
     (let [clip-n (mat/mvmul
                   (mat/mmul (:projection-matrix state)
                             (mat/mmul (:view-matrix state)
@@ -20,7 +17,6 @@
                       [(:nx v) (:ny v) (:nz v) 0])
           clip-n (mat/vnorm clip-n)
           n-dot-l (max 0 (mat/dot3 clip-n (:light-vector state)))]
-      ;; a little ambient + diffuse shader
       {:r (min 1.0 (+ (* 0.2 (:r v)) (* n-dot-l (:r v))))
        :g (min 1.0 (+ (* 0.2 (:g v)) (* n-dot-l (:g v))))
        :b (min 1.0 (+ (* 0.2 (:b v)) (* n-dot-l (:b v))))}
@@ -39,85 +35,40 @@
                 [(:x v) (:y v) (:z v) 1])
         rgb-v (vertex-light state v)
         ]
-    ;;(println "shade-vertices" v)
-    (into v {:clip clip-v
-             :r (:r rgb-v)
+    (into v {:clip clip-v   ;; required clip-coord vert
+             :r (:r rgb-v)  ;; other attrs required by pixel shader
              :g (:g rgb-v)
              :b (:b rgb-v)
              })))
 
-;; (partial shade-vertices your-vs) ??
-(defn shade-vertices
-  "input world-space vertices, output projected clip-coord vertices"
-  [state object-vertices]
-  ;;(println "VS" object-vertices)
-  (for [vertices object-vertices]
-    (for [v vertices]
-      (shade-vertex state v))))
-
-(defn project-viewport
-  "input vertices in clip-coords, output processed primitives in
-  window-coords"
-  [state object-vertices]
-  (for [vertices object-vertices]
-    (do
-      (for [v vertices]
-        (do
-          ;; see OpenGL spec 2.11 Coordinate Transformations
-          (let [clip-v (:clip v)
-                ;; ndc = x/w y/w z/w 1/w
-                ndc-v (mat/div
-                       (concat (take 3 clip-v) [1])
-                       (nth clip-v 3))
-                [vox voy px py] (:viewport state)
-                ox       (+ vox (/ px 2))
-                window-x (+ (* (/ px 2) (ndc-v 0)) ox)
-                oy       (+ voy (/ py 2))
-                window-y (+ (* (/ py 2) (ndc-v 1)) oy)
-                [n f]    (:depth-range state)
-                window-z (+ (* (/ (- f n) 2) (ndc-v 2)) (/ (+ n f) 2))
-                window-w (ndc-v 3)
-                ]
-            (into v {:window [window-x window-y window-z window-w]})
-            ))))))
-
-(defn primitive-clip-cull
-  "input projected vertices, output primitives (triangles)"
-  [state object-vertices]
-  (for [vertices object-vertices]
-    (do
-      ;;(println "pa" vertices)
-      (for [p (partition 3 vertices)]
-        (do
-          ;;(println "primitive-assembly" p)
-          ;; clipless rasterizer :^) FIXME
-          p)))))
+;; ======================================================================
+;; rasterization helper routines
 
 ;; http://www.blackpawn.com/texts/pointinpoly/
-(defn same-side
+(defn same-side?
+  "are P1 and P2 both on the same side of the line through AB?"
   [P1 P2 A B]
   (let [p1 (concat P1 [0])
         p2 (concat P2 [0])
         a  (concat A [0])
         b  (concat B [0])
         cp1 (mat/cross (mat/vsub3 b a) (mat/vsub3 p1 a))
-        ;;_ (println cp1)
         cp2 (mat/cross (mat/vsub3 b a) (mat/vsub3 p2 a))
-        ;;_ (println cp2)
         dp (mat/dot3 cp1 cp2)]
-        ;;_ (println dp)]
     (>= dp 0.0)))
 
 (defn pt-inside-tri?
+  "is pt inside the triangle VA VB VC?"
   [va vb vc pt]
   (let [A (take 2 va)
         B (take 2 vb)
         C (take 2 vc)]
-    (and (same-side pt A B C)
-         (same-side pt B A C)
-         (same-side pt C A B))))
+    (and (same-side? pt A B C)
+         (same-side? pt B A C)
+         (same-side? pt C A B))))
 
 (defn in-viewport?
+  "is x,y inside the viewport?"
   [state x y]
   (and (>= x ((:viewport state) 0))
        (< x (+ ((:viewport state) 0) ((:viewport state) 2)))
@@ -125,6 +76,7 @@
        (< y (+ ((:viewport state) 1) ((:viewport state) 3)))))
 
 (defn in-fb?
+  "is x,y inside the framebuffer port that your thread owns?"
   [state x y]
   (and (>= x ((:fbport state) 0))
        (< x (+ ((:fbport state) 0) ((:fbport state) 2)))
@@ -132,11 +84,14 @@
        (< y (+ ((:fbport state) 1) ((:fbport state) 3)))))
 
 (defn rasterize-triangle
+  "given 3 2d points, output the xy pairs describing the points inside."
   [state va vb vc]
   (let [x-min (Math/floor (min (va 0) (vb 0) (vc 0)))
         x-max (Math/ceil (max (va 0) (vb 0) (vc 0)))
         y-min (Math/floor (min (va 1) (vb 1) (vc 1)))
         y-max (Math/ceil (max (va 1) (vb 1) (vc 1)))]
+    ;; it turned out to be very important for performance to make sure
+    ;; we only rasterized pixels inside our thread's framebuffer.
     (filter (fn [[x y]] (and (in-fb? state x y)
                             (in-viewport? state x y)
                             (pt-inside-tri? va vb vc [x y])))
@@ -146,43 +101,31 @@
               ;; pixels are centered in the middle
               [(+ x 0.5) (+ y 0.5)]))))
 
-(defn rasterize
-  "input primitives, output rasterized fragments"
-  [state object-primitives]
-  (for [primitives object-primitives]
-    (do
-      ;;(println "prims" primitives)
-      (for [prim primitives]
-        (do
-          ;;(println "prim" prim)
-          {:vertices prim
-           :pixels (rasterize-triangle state
-                                       (:window (nth prim 0))
-                                       (:window (nth prim 1))
-                                       (:window (nth prim 2)))})))))
-;;(println (run))
+;; ======================================================================
+;; pixel shader helper routines
 
 (defn triangle-area
+  "find the area of the triangle given 3 2d points"
   [a b c]
   (let [ab (concat (mat/vsub2 b a) [0])
         ac (concat (mat/vsub2 c a) [0])
-        ;; wow, the following abs annotation helped significantly
-        mag (Math/abs ^double (nth (mat/cross ab ac) 2))] ;; we know mag is all in Z comp
+        ;; we know mag is all in Z component when crossing xy0 vectors
+        ;; wow, the following abs annotation helped perf significantly
+        mag (Math/abs ^double (nth (mat/cross ab ac) 2))]
   (* 0.5 mag)))
-;; (triangle-area [0 0] [10 0] [10 10])
 
 (defn interpolate
   "interpolate barycentric coords according to formula 3.6 in OpenGL Spec 1.5"
   [attr prim aow bow cow]
   (let [fa (attr (nth prim 0))
         fb (attr (nth prim 1))
-        fc (attr (nth prim 2))
-        ]
-    ;;(println "intrp" fa fb fc aow bow cow)
+        fc (attr (nth prim 2))]
     (/ (+ (* fa aow) (* fb bow) (* fc cow))
        (+ (* 1 aow) (* 1 bow) (* 1 cow))))) ;; FIXME for q
 
 (defn shade-pixel
+  "shade a single pixel and derive the :r :g :b color and :z depth. :x
+   and :y are also passed through"
   [prim x y]
   (let [pt [x y]
         pa (take 2 (:window (nth prim 0)))
@@ -209,33 +152,18 @@
         ]
     {:x x :y y :z z :r r :g g :b b}))
 
-
-(defn shade-pixels
-  "input unshaded pixels, output shaded pixels"
-  [state objects-prims-pixels]
-  ;;(println "PS" object-prim-pixels)
-  (for [prims-pixels objects-prims-pixels]
-    (for [prim-pixels prims-pixels]
-      (let [prim (:vertices prim-pixels)
-            pixels (:pixels prim-pixels)]
-        ;;(println "prim-pixels" prim )
-        {:vertices prim
-         :pixels (for [p pixels]
-                   (let [x (first p)
-                         y (second p)]
-                     ;;(println "shade-pixels" x y)
-                     (into {:x x :y y} (shade-pixel prim x y))))}
-        ))))
+;; ======================================================================
+;; framebuffer operation helper routines
 
 (defn framebuffer-operations*
+  "input shaded fragments, write them into the framebuffer.  A
+   transient structure is used here as a performance optimization"
   [state framebuffer object-prim-pixels]
   (persistent!
    (reduce
     ;; reduce into a transient copy of the framebuffer
     (fn [fb [i src-pixel]]
-      (let [;;_ (println "fb  i" i)
-            ;;_ (when (> i (count fb)) (println "OUT OF RANGE" i))
-            dest-pixel (nth fb i)]
+      (let [dest-pixel (nth fb i)]
         (if (< (:z src-pixel) (:z dest-pixel))
           (assoc! fb i src-pixel)
           fb)))
@@ -246,70 +174,154 @@
             h (:height framebuffer)
             x (Math/floor (- (:x src-pixel) ((:fbport state) 0)))
             y (Math/floor (- (:y src-pixel) ((:fbport state) 1)))
-            ;;_ (println "fb xy" x y)
             i (int (+ (* y w) x))]
         [i src-pixel])))))
-
-(defn framebuffer-operations
-  "input shaded fragments, write them to the framebuffer"
-  [state framebuffer object-prim-pixels]
-  (into framebuffer {:data (framebuffer-operations* state
-                                                    framebuffer
-                                                    object-prim-pixels)}))
 
 (defn resolve-framebuffers
   "combine future-sources into dest framebuffer.  assumes they stack in y"
   [dest future-sources]
-  (assoc dest :data (apply vector
-                           (apply concat
-                                  (map #(:data @%) future-sources)))))
+  (assoc dest :data (apply vector (mapcat #(:data @%) future-sources))))
 
+;; ======================================================================
 (defn debug-stage
   [lbl x]
   (binding [*out* *err*]
-    (println "======================================================================")
+    (println "============================================================")
     (println lbl)
     (println x)
-    (println "======================================================================"))
+    (println "============================================================"))
   x)
 
+;; ======================================================================
+;; The graphics pipeline
+
+(defn evaluate
+  "for each input object, evaluate it to decompose it into a sequence
+   of world-space vertices"
+  [state objects]
+  (for [o objects]
+    (g/evaluate-object o)))
+
+;; FIXME -- allow user to update vertex-shader instead of hard-coding
+(defn shade-vertices
+  "for each input object, containing a sequence of world-space
+   vertices, output shaded clip-coord vertices as a map with :clip
+   holding the clip-coords and other attributes required by the pixel
+   shader."
+  [state object-vertices]
+  (for [vertices object-vertices]
+    (for [v vertices]
+      (shade-vertex state v))))
+
+(defn project-viewport
+  "for each input object and input clip-coord vertices, output
+   window-coord vertices in :window"
+  [state object-vertices]
+  (for [vertices object-vertices]
+    (for [v vertices]
+      ;; see OpenGL spec 2.11 Coordinate Transformations
+      (let [clip-v (:clip v)
+            ;; Normalized Device Coords = x/w y/w z/w 1/w
+            ndc-v (mat/div
+                   (concat (take 3 clip-v) [1])
+                   (nth clip-v 3))
+            [vox voy px py] (:viewport state)
+            ox       (+ vox (/ px 2))
+            window-x (+ (* (/ px 2) (ndc-v 0)) ox)
+            oy       (+ voy (/ py 2))
+            window-y (+ (* (/ py 2) (ndc-v 1)) oy)
+            [n f]    (:depth-range state)
+            window-z (+ (* (/ (- f n) 2) (ndc-v 2)) (/ (+ n f) 2))
+            window-w (ndc-v 3)
+            ]
+        (into v {:window [window-x window-y window-z window-w]})))))
+
+(defn primitive-clip-cull
+  "for each object and window-space vertices, gather them into
+   3-vertex triangles, clip them (FIXME), cull them (FIXME) and output
+   as 3-vertex sequences"
+  [state object-vertices]
+  (for [vertices object-vertices]
+    (for [p (partition 3 vertices)]
+      ;; FIXME -- add clipping when necessary
+      ;; FIXME -- add backface culling
+      p)))
+
+(defn rasterize
+  "for each object and primitive, output a rasterized-primitive map of
+   the input :prim (for use in barycentric pixel-shader attribute
+   calculations) and all the [x y] pixel-center pairs of :pixels that
+   result when the triangle is rasterized."
+  [state object-primitives]
+  (for [primitives object-primitives]
+    (for [prim primitives]
+      {:prim prim
+       :pixels (rasterize-triangle state
+                                   (:window (nth prim 0))
+                                   (:window (nth prim 1))
+                                   (:window (nth prim 2)))})))
+
+;; FIXME -- allow user to specify a pixel shader
+(defn shade-pixels
+  "for each object and primitive containing unshaded pixel centers,
+   output shaded pixels containing :x :y :z and :r :g :b"
+  [state objects-prims-pixels]
+  (for [prims-pixels objects-prims-pixels]
+    (for [prim-pixels prims-pixels]
+      (let [prim (:prim prim-pixels)      ;; FIXME use
+            pixels (:pixels prim-pixels)]
+        {:prim prim
+         :pixels (for [p pixels]
+                   (let [x (first p)
+                         y (second p)]
+                     (shade-pixel prim x y)))}))))
+
+(defn framebuffer-operations
+  "input shaded fragments, write them to the framebuffer"
+  [state framebuffer object-prim-pixels]
+  (into framebuffer
+        {:data (framebuffer-operations* state
+                                        framebuffer
+                                        object-prim-pixels)}))
+
+;; ======================================================================
+
 (defn render-framebuffer
-  "take in an object, decompose it to triangles, pass them through the
-  pipeline and output to framebuffer"
+  "Take in a list of objects, evaluate each objects, turning it into triangles,
+  pass the triangles through the graphics pipeline and output the
+  colored pixels to framebuffer.  Pipeline is similar to the early
+  OpenGL pipeline."
   [state framebuffer objects]
   (->> (evaluate state objects)
-       ;;(debug-stage "evaluate output")
        (shade-vertices state)
-       ;;(debug-stage "shade-vertices output")
        (project-viewport state)
-       ;;(debug-stage "project-viewport output")
        (primitive-clip-cull state)
-       ;;(debug-stage "clip-cull output")
        (rasterize state)
-       ;;(debug-stage "rasterize output")
        (shade-pixels state)
-       ;;(debug-stage "shade-pixels output")
        (framebuffer-operations state framebuffer)))
 
-(defn parallel-render-framebuffer ;; ??? multimethod?
+(defn parallel-render-framebuffer
+  "Allow for 'embarassing parallelism' and the speedup that can come
+  with this.  Divide up rendering into n horizontal swaths.  n must
+  divide into the framebuffer height evenly"
   [n state framebuffer objects]
-  (->>
-   (let [w (:width framebuffer)
-         h (:height framebuffer)
-         hon (int (/ h n))
-         _ (assert (== (rem h n) 0))
-         [fbx fby fbw fbh] (:fbport state)]
-     (for [cur-fby (range 0 h hon)]
-       (future
-         (render-framebuffer
-                (assoc state
-                  :fbport [fbx cur-fby fbw hon])
-                (assoc framebuffer
-                  :y      cur-fby
-                  :height hon
-                  ;; allocate the data for sub-framebuffers
-                  :data   (vec (repeat (* w hon)
-                                       {:r 0 :g 0 :b 0 :z 1000}))
-                  )
-                objects))))
-   (resolve-framebuffers framebuffer)))
+   (resolve-framebuffers
+    framebuffer
+    (let [w (:width framebuffer)
+          h (:height framebuffer)
+          hon (int (/ h n))
+          _ (assert (zero? (rem h n)))
+          [fbx fby fbw fbh] (:fbport state)]
+      (for [cur-fby (range 0 h hon)]
+        (future
+          (render-framebuffer
+           (assoc state
+             :fbport [fbx cur-fby fbw hon])
+           (assoc framebuffer
+             :y      cur-fby
+             :height hon
+             ;; allocate the data for sub-framebuffers
+             :data   (vec (repeat (* w hon)
+                                  {:r 0 :g 0 :b 0 :z 1000}))
+             )
+           objects))))))

@@ -1,6 +1,7 @@
 (ns iris.matrix)
-;; a hand-made matrix library only suitable for use in a self-contained project like this.
-;; this is NOT trying to be a "real" library.
+;; a hand-made matrix library only suitable for use in a
+;; self-contained project like this.  this is NOT trying to be a real
+;; library.  Code was added as-needed.
 
 (defn identity-matrix
   "return a 4x4 identity matrix"

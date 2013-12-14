@@ -1,10 +1,5 @@
 (ns iris.geometry)
 
-;;  y1 34   6  . 6   43
-;;        f    .    b
-;;  y0 1   25  . 52   1
-;;    x0   x1
-
 (defn evaluate-cube
   [object]
   (let [[cx cy cz] (:center object)
@@ -66,10 +61,8 @@
   "an object is a map with a :type and associated data.  Output
   triangles for processing by a vertex shader"
   [object]
-  (do
-    ;;(println "evaluate" object)
-    (case (:type object)
-      :triangle-list (:vertices object)
-      :cube (evaluate-cube object)
-      ;; TODO sphere, etc.  add some things with normals
-      (assert false))))
+  (case (:type object)
+    :triangle-list (:vertices object)
+    :cube (evaluate-cube object)
+    ;; TODO sphere, etc.  add some things with normals
+    (assert false)))

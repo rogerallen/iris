@@ -9,6 +9,7 @@
 ;; TODO
 ;; o user vertex/pixel shader functions
 ;; o texturing
+;; o objects should allow "commands" in-band to modify state
 
 (defn run [n width height]
   (let [objects [{:type     :triangle-list
