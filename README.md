@@ -45,3 +45,5 @@ Copyright © 2013 Roger Allen
 
 Distributed under the Eclipse Public License either version 1.0 or (at
 your option) any later version.
+
+[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/rogerallen/iris/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
