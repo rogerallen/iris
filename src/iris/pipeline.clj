@@ -126,7 +126,7 @@
 (defn shade-pixel
   "shade a single pixel and derive the :r :g :b color and :z depth. :x
    and :y are also passed through"
-  [prim x y]
+  [prim [x y]]
   (let [pt [x y]
         pa (take 2 (:window (nth prim 0)))
         pb (take 2 (:window (nth prim 1)))
@@ -268,13 +268,8 @@
   [state objects-prims-pixels]
   (for [prims-pixels objects-prims-pixels]
     (for [prim-pixels prims-pixels]
-      (let [prim (:prim prim-pixels)      ;; FIXME use
-            pixels (:pixels prim-pixels)]
-        {:prim prim
-         :pixels (for [p pixels]
-                   (let [x (first p)
-                         y (second p)]
-                     (shade-pixel prim x y)))}))))
+      (into prim-pixels {:pixels (map #(shade-pixel (:prim prim-pixels) %)
+                                      (:pixels prim-pixels))}))))
 
 (defn framebuffer-operations
   "input shaded fragments, write them to the framebuffer"
