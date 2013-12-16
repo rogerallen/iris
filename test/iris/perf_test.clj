@@ -137,7 +137,162 @@
           crc (util/check-crc framebuffer)]
       (is (= crc the-crc)))))
 
-(deftest single-fullscreen-triangle-all
+;; ======================================================================
+(defn many-triangles-setup
+  []
+  (let [dim 384
+        cubes (apply
+               vector
+               (flatten
+                (for [x (range -1.0 1.01 0.4)]
+                  (for [y (range -1.0 1.01 0.4)]
+                    (for [z (range -1.0 1.01 0.4)]
+                      {:type   :cube
+                       :center [x y z]
+                       :x-size 0.1 :y-size 0.1 :z-size 0.1
+                       :color  {:r (/ (inc x) 2) :g (/ (inc y) 2) :b (/ (inc z) 2)}
+                       })))))]
+    [dim
+     cubes
+     {:viewport          [0 0 dim dim]
+      :fbport            [0 0 dim dim]
+      :depth-range       [0.0 1.0]
+      :light-vector      [0.5773502691896258 0.5773502691896258 -0.5773502691896258]
+      :view-matrix       (mat/look-at [0.2 1.7 -5.0] [0.0 0.0 0.0] [0.0 1.0 0.0])
+      :model-matrix      (mat/identity-matrix)
+      :projection-matrix (mat/perspective (Math/toRadians 25) 1.0 1.0 10.0)
+      }
+     {:x      0
+      :y      0
+      :width  dim
+      :height dim
+      :data   (vec (repeat (* dim dim) {:r 0 :g 0 :b 0 :z 1}))
+      }
+     1165338380]))
+
+;; FIXME - would be nice to have a macro for this
+(deftest many-triangles
+  (testing "216 cubes  no parallelism"
+    (let [[dim objects state framebuffer the-crc] (many-triangles-setup)
+          _ (print *testing-contexts* ": ")
+          framebuffer (time (iris/render-framebuffer state framebuffer objects))
+          ;;_ (util/print-fb-to-ppm framebuffer)
+          crc (util/check-crc framebuffer)]
+      (is (= crc the-crc)))))
+
+(deftest many-triangles-2
+  (testing "216 cubes  2x parallelism"
+    (let [n 2
+          [dim objects state framebuffer the-crc] (many-triangles-setup)
+          _ (print *testing-contexts* ": ")
+          framebuffer (time (iris/parallel-render-framebuffer
+                             n state framebuffer objects))
+          ;;_ (util/print-fb-to-ppm framebuffer)
+          crc (util/check-crc framebuffer)]
+      (is (= crc the-crc)))))
+
+(deftest many-triangles-3
+  (testing "216 cubes  3x parallelism"
+    (let [n 3
+          [dim objects state framebuffer the-crc] (many-triangles-setup)
+          _ (print *testing-contexts* ": ")
+          framebuffer (time (iris/parallel-render-framebuffer
+                             n state framebuffer objects))
+          ;;_ (util/print-fb-to-ppm framebuffer)
+          crc (util/check-crc framebuffer)]
+      (is (= crc the-crc)))))
+
+(deftest many-triangles-4
+  (testing "216 cubes  4x parallelism"
+    (let [n 4
+          [dim objects state framebuffer the-crc] (many-triangles-setup)
+          _ (print *testing-contexts* ": ")
+          framebuffer (time (iris/parallel-render-framebuffer
+                             n state framebuffer objects))
+          ;;_ (util/print-fb-to-ppm framebuffer)
+          crc (util/check-crc framebuffer)]
+      (is (= crc the-crc)))))
+
+(deftest many-triangles-6
+  (testing "216 cubes  6x parallelism"
+    (let [n 6
+          [dim objects state framebuffer the-crc] (many-triangles-setup)
+          _ (print *testing-contexts* ": ")
+          framebuffer (time (iris/parallel-render-framebuffer
+                             n state framebuffer objects))
+          ;;_ (util/print-fb-to-ppm framebuffer)
+          crc (util/check-crc framebuffer)]
+      (is (= crc the-crc)))))
+
+(deftest many-triangles-8
+  (testing "216 cubes  8x parallelism"
+    (let [n 8
+          [dim objects state framebuffer the-crc] (many-triangles-setup)
+          _ (print *testing-contexts* ": ")
+          framebuffer (time (iris/parallel-render-framebuffer
+                             n state framebuffer objects))
+          ;;_ (util/print-fb-to-ppm framebuffer)
+          crc (util/check-crc framebuffer)]
+      (is (= crc the-crc)))))
+
+(deftest many-triangles-12
+  (testing "216 cubes 12x parallelism"
+    (let [n 12
+          [dim objects state framebuffer the-crc] (many-triangles-setup)
+          _ (print *testing-contexts* ": ")
+          framebuffer (time (iris/parallel-render-framebuffer
+                             n state framebuffer objects))
+          ;;_ (util/print-fb-to-ppm framebuffer)
+          crc (util/check-crc framebuffer)]
+      (is (= crc the-crc)))))
+
+(deftest many-triangles-16
+  (testing "216 cubes 16x parallelism"
+    (let [n 16
+          [dim objects state framebuffer the-crc] (many-triangles-setup)
+          _ (print *testing-contexts* ": ")
+          framebuffer (time (iris/parallel-render-framebuffer
+                             n state framebuffer objects))
+          ;;_ (util/print-fb-to-ppm framebuffer)
+          crc (util/check-crc framebuffer)]
+      (is (= crc the-crc)))))
+
+(deftest many-triangles-24
+  (testing "216 cubes 24x parallelism"
+    (let [n 24
+          [dim objects state framebuffer the-crc] (many-triangles-setup)
+          _ (print *testing-contexts* ": ")
+          framebuffer (time (iris/parallel-render-framebuffer
+                             n state framebuffer objects))
+          ;;_ (util/print-fb-to-ppm framebuffer)
+          crc (util/check-crc framebuffer)]
+      (is (= crc the-crc)))))
+
+(deftest many-triangles-32
+  (testing "216 cubes 32x parallelism"
+    (let [n 32
+          [dim objects state framebuffer the-crc] (many-triangles-setup)
+          _ (print *testing-contexts* ": ")
+          framebuffer (time (iris/parallel-render-framebuffer
+                             n state framebuffer objects))
+          ;;_ (util/print-fb-to-ppm framebuffer)
+          crc (util/check-crc framebuffer)]
+      (is (= crc the-crc)))))
+
+;; ======================================================================
+
+(deftest perf-test-all
+  (many-triangles)
+  (many-triangles-2)
+  (many-triangles-3)
+  (many-triangles-4)
+  (many-triangles-6)
+  (many-triangles-8)
+  (many-triangles-12)
+  (many-triangles-16)
+  (many-triangles-24)
+  (many-triangles-32)
+
   (single-fullscreen-triangle)
   (single-fullscreen-triangle-2)
   (single-fullscreen-triangle-3)
@@ -150,4 +305,4 @@
   (single-fullscreen-triangle-32))
 
 (defn test-ns-hook []
-  (single-fullscreen-triangle-all))
+  (perf-test-all))
