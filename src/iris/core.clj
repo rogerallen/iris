@@ -4,7 +4,10 @@
             [iris.matrix :as mat]
             [iris.pipeline :as iris]
             [iris.util :as util])
+  (:import  [iris.matrix Matrix4x4 Vector2 Vector3 Vector4])
   (:gen-class))
+
+;;(set! *unchecked-math* true)
 
 ;; TODO
 ;; o user vertex/pixel shader functions
@@ -25,9 +28,9 @@
                              {:x -0.3 :y -1.2 :z 0.25 :r 0.0 :g 1.0 :b 0.0}
                              {:x -0.3 :y  1.2 :z 0.25 :r 0.0 :g 0.0 :b 1.0}
                              ]}]
-        state {:viewport [0 0 width height]
-               :fbport [0 0 width height]
-               :depth-range [0.0 1.0]
+        state {:viewport (Vector4. 0 0 width height)
+               :fbport (Vector4. 0 0 width height)
+               :depth-range (Vector2. 0.0 1.0)
                ;; manipulate via gluLookAt
                :view-matrix (mat/identity-matrix)
                ;; manipulate via glScale/Rotate/Translate

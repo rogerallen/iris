@@ -1,0 +1,434 @@
+* optimization
+
+inspired by http://insideclojure.org/2014/12/15/warn-on-boxed/
+
+* disassembling initial thoughts
+
+```
+(defn vmuls
+  "3d vector times scalar"
+  ^doubles [^doubles [x y z] ^double s]
+  [(* x s) (* y s) (* z s)])
+
+(require '[no.disassemble :refer (disassemble)])
+
+(println
+  (disassemble
+    (fn ^doubles [^doubles [x y z] ^double s]
+      [(* x s) (* y s) (* z s)])))
+
+  // Method descriptor #53 (Ljava/lang/Object;D)Ljava/lang/Object;
+  // Stack: 6, Locals: 8
+  public final java.lang.Object invokePrim(java.lang.Object p__4346, double s);
+     0  aload_1 [p__4346]
+     1  aconst_null
+     2  astore_1 [p__4346]
+     3  astore 4 [vec__4348]
+     5  aload 4 [vec__4348]
+     7  lconst_0
+     8  invokestatic clojure.lang.RT.intCast(long) : int [57]
+    11  aconst_null
+    12  invokestatic clojure.lang.RT.nth(java.lang.Object, int, java.lang.Object) : java.lang.Object [60]
+    15  astore 5 [x]
+    17  aload 4 [vec__4348]
+    19  lconst_1
+    20  invokestatic clojure.lang.RT.intCast(long) : int [57]
+    23  aconst_null
+    24  invokestatic clojure.lang.RT.nth(java.lang.Object, int, java.lang.Object) : java.lang.Object [60]
+    27  astore 6 [y]
+    29  aload 4 [vec__4348]
+    31  aconst_null
+    32  astore 4 [vec__4348]
+    34  ldc2_w <Long 2> [41]
+    37  invokestatic clojure.lang.RT.intCast(long) : int [57]
+    40  aconst_null
+    41  invokestatic clojure.lang.RT.nth(java.lang.Object, int, java.lang.Object) : java.lang.Object [60]
+    44  astore 7 [z]
+    46  iconst_3
+    47  anewarray java.lang.Object [62]
+    50  dup
+    51  iconst_0
+    52  aload 5 [x]
+    54  aconst_null
+    55  astore 5 [x]
+    57  dload_2 [s]
+    58  invokestatic clojure.lang.Numbers.multiply(java.lang.Object, double) : double [68]
+    61  invokestatic java.lang.Double.valueOf(double) : java.lang.Double [73]
+    64  aastore
+    65  dup
+    66  iconst_1
+    67  aload 6 [y]
+    69  aconst_null
+    70  astore 6 [y]
+    72  dload_2 [s]
+    73  invokestatic clojure.lang.Numbers.multiply(java.lang.Object, double) : double [68]
+    76  invokestatic java.lang.Double.valueOf(double) : java.lang.Double [73]
+    79  aastore
+    80  dup
+    81  iconst_2
+    82  aload 7 [z]
+    84  aconst_null
+    85  astore 7 [z]
+    87  dload_2 [s]
+    88  invokestatic clojure.lang.Numbers.multiply(java.lang.Object, double) : double [68]
+    91  invokestatic java.lang.Double.valueOf(double) : java.lang.Double [73]
+    94  aastore
+    95  invokestatic clojure.lang.RT.vector(java.lang.Object[]) : clojure.lang.IPersistentVector [77]
+    98  areturn
+
+(println
+  (disassemble
+    (fn ^doubles [^double x ^double y ^double z ^double s]
+      [(* x s) (* y s) (* z s)])))
+
+  public final double[] invokePrim(double x, double z, double arg2, double arg3);
+     0  iconst_3
+     1  anewarray java.lang.Object [32]
+     4  dup
+     5  iconst_0
+     6  dload_1 [x]
+     7  dload 7 [arg3]
+     9  invokestatic clojure.lang.Numbers.multiply(double, double) : double [38]
+    12  invokestatic java.lang.Double.valueOf(double) : java.lang.Double [44]
+    15  aastore
+    16  dup
+    17  iconst_1
+    18  dload_3 [z]
+    19  dload 7 [arg3]
+    21  invokestatic clojure.lang.Numbers.multiply(double, double) : double [38]
+    24  invokestatic java.lang.Double.valueOf(double) : java.lang.Double [44]
+    27  aastore
+    28  dup
+    29  iconst_2
+    30  dload 5 [arg2]
+    32  dload 7 [arg3]
+    34  invokestatic clojure.lang.Numbers.multiply(double, double) : double [38]
+    37  invokestatic java.lang.Double.valueOf(double) : java.lang.Double [44]
+    40  aastore
+    41  invokestatic clojure.lang.RT.vector(java.lang.Object[]) : clojure.lang.IPersistentVector [48]
+    44  checkcast double[] [50]
+    47  areturn
+
+(set! *unchecked-math* true)
+
+  public final double[] invokePrim(double x, double z, double arg2, double arg3);
+     0  iconst_3
+     1  anewarray java.lang.Object [32]
+     4  dup
+     5  iconst_0
+     6  dload_1 [x]
+     7  dload 7 [arg3]
+     9  invokestatic clojure.lang.Numbers.unchecked_multiply(double, double) : double [38]
+    12  invokestatic java.lang.Double.valueOf(double) : java.lang.Double [44]
+    15  aastore
+    16  dup
+    17  iconst_1
+    18  dload_3 [z]
+    19  dload 7 [arg3]
+    21  invokestatic clojure.lang.Numbers.unchecked_multiply(double, double) : double [38]
+    24  invokestatic java.lang.Double.valueOf(double) : java.lang.Double [44]
+    27  aastore
+    28  dup
+    29  iconst_2
+    30  dload 5 [arg2]
+    32  dload 7 [arg3]
+    34  invokestatic clojure.lang.Numbers.unchecked_multiply(double, double) : double [38]
+    37  invokestatic java.lang.Double.valueOf(double) : java.lang.Double [44]
+    40  aastore
+    41  invokestatic clojure.lang.RT.vector(java.lang.Object[]) : clojure.lang.IPersistentVector [48]
+    44  checkcast double[] [50]
+    47  areturn
+```
+
+hmmm...
+
+```
+(println
+  (disassemble
+    (fn ^double [^double x ^double y ^double z ^double s]
+      (+ (* x s) (* y s) (* z s)))))
+
+  public final double invokePrim(double x, double z, double arg2, double arg3);
+     0  dload_1 [x]
+     1  dload 7 [arg3]
+     3  dmul
+     4  dload_3 [z]
+     5  dload 7 [arg3]
+     7  dmul
+     8  dadd
+     9  dload 5 [arg2]
+    11  dload 7 [arg3]
+    13  dmul
+    14  dadd
+    15  dreturn
+```
+
+http://stackoverflow.com/questions/11824815/fast-complex-number-arithmetic-in-clojure
+also check out http://www.infoq.com/presentations/Crunching-Numbers-Clojure
+https://github.com/strangeloop/clojurewest2012-slides/blob/master/Solano-G%C3%B3mez-Crunching-Numbers-with-Clojure.pdf (download raw)
+
+```
+(deftype Vector3 [^double x ^double y ^double z])
+
+(println
+  (disassemble
+    (fn ^Vector3 [^Vector3 v ^double s]
+    (Vector3. (* (.x v) s) (* (.y v) s) (* (.z v) s)))))
+
+  public final iris.core.Vector3 invokePrim(java.lang.Object v, double s);
+     0  new iris.core.Vector3 [32]
+     3  dup
+     4  aload_1 [v]
+     5  checkcast iris.core.Vector3 [32]
+     8  getfield iris.core.Vector3.x : double [36]
+    11  dload_2 [s]
+    12  dmul
+    13  aload_1 [v]
+    14  checkcast iris.core.Vector3 [32]
+    17  getfield iris.core.Vector3.y : double [39]
+    20  dload_2 [s]
+    21  dmul
+    22  aload_1 [v]
+    23  aconst_null
+    24  astore_1 [v]
+    25  checkcast iris.core.Vector3 [32]
+    28  getfield iris.core.Vector3.z : double [42]
+    31  dload_2 [s]
+    32  dmul
+    33  invokespecial iris.core.Vector3(double, double, double) [45]
+    36  checkcast iris.core.Vector3 [32]
+    39  areturn
+```
+
+Well, it is simpler to add a defrecord. Will that work?
+
+```
+(defrecord Vector3 [^double x ^double y ^double z])
+
+(println
+  (disassemble
+    (fn ^Vector3 [^Vector3 v ^double s]
+    (Vector3. (* (.x v) s) (* (.y v) s) (* (.z v) s)))))
+
+  public final iris.matrix.Vector3 invokePrim(java.lang.Object v, double s);
+     0  new iris.matrix.Vector3 [32]
+     3  dup
+     4  aload_1 [v]
+     5  checkcast iris.matrix.Vector3 [32]
+     8  getfield iris.matrix.Vector3.x : double [36]
+    11  dload_2 [s]
+    12  dmul
+    13  aload_1 [v]
+    14  checkcast iris.matrix.Vector3 [32]
+    17  getfield iris.matrix.Vector3.y : double [39]
+    20  dload_2 [s]
+    21  dmul
+    22  aload_1 [v]
+    23  aconst_null
+    24  astore_1 [v]
+    25  checkcast iris.matrix.Vector3 [32]
+    28  getfield iris.matrix.Vector3.z : double [42]
+    31  dload_2 [s]
+    32  dmul
+    33  invokespecial iris.matrix.Vector3(double, double, double) [45]
+    36  checkcast iris.matrix.Vector3 [32]
+    39  areturn
+```
+
+Yep, looks good
+
+Okay, what is up here?
+
+```
+iris.matrix> ((fn ^Vector2 [^Vector2 u ^Vector2 v] (Vector2. (- (.x u) (.x v)) (- (.y u) (.y v))))
+              (Vector2. 3 4)
+              (Vector2. 1 2))
+#iris.matrix.Vector2{:x 2.0, :y 2.0}
+```
+
+works, but
+
+```
+iris.matrix> ((fn ^Vector2 [^Vector2 v ^double s] (Vector2. (* (.x v) s) (* (.y v) s)))
+              (Vector2. 1 2)
+              3.0)
+NoSuchMethodError clojure.lang.IFn$ODO.invokePrim(Ljava/lang/Object;D)Liris/matrix/Vector2;  iris.matrix/eval3903/fn--3904 (form-init8016029507365162516.clj:-1)
+```
+
+and stripping off the annotation works
+
+```
+iris.matrix> ((fn [^Vector2 v ^double s] (Vector2. (* (.x v) s) (* (.y v) s)))
+              (Vector2. 1 2)
+              3.0)
+#iris.matrix.Vector2{:x 3.0, :y 6.0}
+```
+
+First case:
+
+```
+(println (disassemble (fn ^Vector2 [^Vector2 u ^Vector2 v] (Vector2. (- (.x u) (.x v)) (- (.y u) (.y v))))))
+
+// Compiled from form-init8016029507365162516.clj (version 1.5 : 49.0, super bit)
+public final class iris.matrix$eval3914$fn__3915 extends clojure.lang.AFunction {
+
+  // Field descriptor #7 Lclojure/lang/Var;
+  public static final clojure.lang.Var const__0;
+
+  // Method descriptor #9 ()V
+  // Stack: 2, Locals: 0
+  public static {};
+     0  ldc <String "clojure.core"> [11]
+     2  ldc <String "-"> [13]
+     4  invokestatic clojure.lang.RT.var(java.lang.String, java.lang.String) : clojure.lang.Var [19]
+     7  checkcast clojure.lang.Var [21]
+    10  putstatic iris.matrix$eval3914$fn__3915.const__0 : clojure.lang.Var [23]
+    13  return
+      Line numbers:
+        [pc: 0, line: 1]
+
+  // Method descriptor #9 ()V
+  // Stack: 1, Locals: 1
+  public matrix$eval3914$fn__3915();
+    0  aload_0 [this]
+    1  invokespecial clojure.lang.AFunction() [26]
+    4  return
+      Line numbers:
+        [pc: 0, line: 1]
+
+  // Method descriptor #28 (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+  // Stack: 8, Locals: 3
+  public java.lang.Object invoke(java.lang.Object u, java.lang.Object v);
+     0  new iris.matrix.Vector2 [30]
+     3  dup
+     4  aload_1 [u]
+     5  checkcast iris.matrix.Vector2 [30]
+     8  getfield iris.matrix.Vector2.x : double [34]
+    11  aload_2 [v]
+    12  checkcast iris.matrix.Vector2 [30]
+    15  getfield iris.matrix.Vector2.x : double [34]
+    18  dsub
+    19  aload_1 [u]
+    20  aconst_null
+    21  astore_1 [u]
+    22  checkcast iris.matrix.Vector2 [30]
+    25  getfield iris.matrix.Vector2.y : double [37]
+    28  aload_2 [v]
+    29  aconst_null
+    30  astore_2 [v]
+    31  checkcast iris.matrix.Vector2 [30]
+    34  getfield iris.matrix.Vector2.y : double [37]
+    37  dsub
+    38  invokespecial iris.matrix.Vector2(double, double) [40]
+    41  areturn
+      Line numbers:
+        [pc: 0, line: 1]
+        [pc: 4, line: 1]
+        [pc: 4, line: 1]
+        [pc: 11, line: 1]
+        [pc: 19, line: 1]
+        [pc: 19, line: 1]
+        [pc: 28, line: 1]
+      Local variable table:
+        [pc: 0, pc: 41] local: this index: 0 type: java.lang.Object
+        [pc: 0, pc: 41] local: u index: 1 type: java.lang.Object
+        [pc: 0, pc: 41] local: v index: 2 type: java.lang.Object
+
+}
+```
+
+Vs:
+
+```
+(println (disassemble (fn ^Vector2 [^Vector2 v ^double s] (Vector2. (* (.x v) s) (* (.y v) s)))))
+
+// Compiled from form-init8016029507365162516.clj (version 1.5 : 49.0, super bit)
+public final class iris.matrix$eval3918$fn__3919 extends clojure.lang.AFunction implements clojure.lang.IFn$ODO {
+
+  // Field descriptor #9 Lclojure/lang/Var;
+  public static final clojure.lang.Var const__0;
+
+  // Method descriptor #11 ()V
+  // Stack: 2, Locals: 0
+  public static {};
+     0  ldc <String "clojure.core"> [13]
+     2  ldc <String "*"> [15]
+     4  invokestatic clojure.lang.RT.var(java.lang.String, java.lang.String) : clojure.lang.Var [21]
+     7  checkcast clojure.lang.Var [23]
+    10  putstatic iris.matrix$eval3918$fn__3919.const__0 : clojure.lang.Var [25]
+    13  return
+      Line numbers:
+        [pc: 0, line: 1]
+
+  // Method descriptor #11 ()V
+  // Stack: 1, Locals: 1
+  public matrix$eval3918$fn__3919();
+    0  aload_0 [this]
+    1  invokespecial clojure.lang.AFunction() [28]
+    4  return
+      Line numbers:
+        [pc: 0, line: 1]
+
+  // Method descriptor #30 (Ljava/lang/Object;D)Liris/matrix/Vector2;
+  // Stack: 8, Locals: 4
+  public final iris.matrix.Vector2 invokePrim(java.lang.Object v, double s);
+     0  new iris.matrix.Vector2 [32]
+     3  dup
+     4  aload_1 [v]
+     5  checkcast iris.matrix.Vector2 [32]
+     8  getfield iris.matrix.Vector2.x : double [36]
+    11  dload_2 [s]
+    12  dmul
+    13  aload_1 [v]
+    14  aconst_null
+    15  astore_1 [v]
+    16  checkcast iris.matrix.Vector2 [32]
+    19  getfield iris.matrix.Vector2.y : double [39]
+    22  dload_2 [s]
+    23  dmul
+    24  invokespecial iris.matrix.Vector2(double, double) [42]
+    27  checkcast iris.matrix.Vector2 [32]
+    30  areturn
+      Line numbers:
+        [pc: 0, line: 1]
+        [pc: 4, line: 1]
+        [pc: 4, line: 1]
+        [pc: 13, line: 1]
+        [pc: 13, line: 1]
+      Local variable table:
+        [pc: 0, pc: 30] local: this index: 0 type: java.lang.Object
+        [pc: 0, pc: 30] local: v index: 1 type: java.lang.Object
+        [pc: 0, pc: 30] local: s index: 2 type: double
+
+  // Method descriptor #48 (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+  // Stack: 4, Locals: 3
+  public java.lang.Object invoke(java.lang.Object arg0, java.lang.Object arg1);
+     0  aload_0 [this]
+     1  aload_1 [arg0]
+     2  aload_2 [arg1]
+     3  checkcast java.lang.Number [50]
+     6  invokestatic clojure.lang.RT.doubleCast(java.lang.Object) : double [54]
+     9  invokeinterface clojure.lang.IFn$ODO.invokePrim(java.lang.Object, double) : iris.matrix.Vector2 [56] [nargs: 4]
+    14  areturn
+```
+
+That looks to me like the first one doesn't actually have a Vector2 return type.
+
+HA!  Updating to clojure 1.6.0 fixes this!
+* first results after implementation
+
+Not good!  46 seconds vs 8(!)
+
+```
+thunder 08:13:43 iris> lein test iris.perf-test
+
+lein test iris.perf-test
+(216 cubes  no parallelism) : "Elapsed time: 46002.356401 msecs"
+
+lein test :only iris.perf-test/many-triangles
+
+FAIL in (perf-test-all many-triangles) (perf_test.clj:184)
+216 cubes  no parallelism
+expected: (= crc the-crc)
+  actual: (not (= 1521780774 1165338380))
+```

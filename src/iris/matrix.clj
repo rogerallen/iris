@@ -3,123 +3,134 @@
 ;; self-contained project like this.  this is NOT trying to be a real
 ;; library.  Code was added as-needed.
 
+;; NOTE: Clojure 1.6.0 fixed some issues with type hints on return values.
+
+(defrecord Matrix4x4 [^double m00 ^double m01 ^double m02 ^double m03
+                      ^double m10 ^double m11 ^double m12 ^double m13
+                      ^double m20 ^double m21 ^double m22 ^double m23
+                      ^double m30 ^double m31 ^double m32 ^double m33])
+(defrecord Vector2 [^double x ^double y])
+(defrecord Vector3 [^double x ^double y ^double z])
+(defrecord Vector4 [^double x ^double y ^double z ^double w])
+
 (defn identity-matrix
   "return a 4x4 identity matrix"
+  ^Matrix4x4
   []
-  [1.0 0.0 0.0 0.0
-   0.0 1.0 0.0 0.0
-   0.0 0.0 1.0 0.0
-   0.0 0.0 0.0 1.0])
+  (Matrix4x4. 1.0 0.0 0.0 0.0
+              0.0 1.0 0.0 0.0
+              0.0 0.0 1.0 0.0
+              0.0 0.0 0.0 1.0))
 
 (defn mmul
   "4x4 matrix multiplication M x N"
-  ^doubles [^doubles [m00 m01 m02 m03
-                      m10 m11 m12 m13
-                      m20 m21 m22 m23
-                      m30 m31 m32 m33]
-            ^doubles [n00 n01 n02 n03
-                      n10 n11 n12 n13
-                      n20 n21 n22 n23
-                      n30 n31 n32 n33]]
+  ^Matrix4x4
+  [^Matrix4x4 m ^Matrix4x4 n]
   ;; take first matrix by rows.  take second matrix by columns
-  [(+ (* m00 n00) (* m01 n10) (* m02 n20) (* m03 n30))
-   (+ (* m00 n01) (* m01 n11) (* m02 n21) (* m03 n31))
-   (+ (* m00 n02) (* m01 n12) (* m02 n22) (* m03 n32))
-   (+ (* m00 n03) (* m01 n13) (* m02 n23) (* m03 n33))
-   (+ (* m10 n00) (* m11 n10) (* m12 n20) (* m13 n30))
-   (+ (* m10 n01) (* m11 n11) (* m12 n21) (* m13 n31))
-   (+ (* m10 n02) (* m11 n12) (* m12 n22) (* m13 n32))
-   (+ (* m10 n03) (* m11 n13) (* m12 n23) (* m13 n33))
-   (+ (* m20 n00) (* m21 n10) (* m22 n20) (* m23 n30))
-   (+ (* m20 n01) (* m21 n11) (* m22 n21) (* m23 n31))
-   (+ (* m20 n02) (* m21 n12) (* m22 n22) (* m23 n32))
-   (+ (* m20 n03) (* m21 n13) (* m22 n23) (* m23 n33))
-   (+ (* m30 n00) (* m31 n10) (* m32 n20) (* m33 n30))
-   (+ (* m30 n01) (* m31 n11) (* m32 n21) (* m33 n31))
-   (+ (* m30 n02) (* m31 n12) (* m32 n22) (* m33 n32))
-   (+ (* m30 n03) (* m31 n13) (* m32 n23) (* m33 n33))])
+  (Matrix4x4.
+   (+ (* (.m00 m) (.m00 n)) (* (.m01 m) (.m10 n)) (* (.m02 m) (.m20 n)) (* (.m03 m) (.m30 n)))
+   (+ (* (.m00 m) (.m01 n)) (* (.m01 m) (.m11 n)) (* (.m02 m) (.m21 n)) (* (.m03 m) (.m31 n)))
+   (+ (* (.m00 m) (.m02 n)) (* (.m01 m) (.m12 n)) (* (.m02 m) (.m22 n)) (* (.m03 m) (.m32 n)))
+   (+ (* (.m00 m) (.m03 n)) (* (.m01 m) (.m13 n)) (* (.m02 m) (.m23 n)) (* (.m03 m) (.m33 n)))
+   (+ (* (.m10 m) (.m00 n)) (* (.m11 m) (.m10 n)) (* (.m12 m) (.m20 n)) (* (.m13 m) (.m30 n)))
+   (+ (* (.m10 m) (.m01 n)) (* (.m11 m) (.m11 n)) (* (.m12 m) (.m21 n)) (* (.m13 m) (.m31 n)))
+   (+ (* (.m10 m) (.m02 n)) (* (.m11 m) (.m12 n)) (* (.m12 m) (.m22 n)) (* (.m13 m) (.m32 n)))
+   (+ (* (.m10 m) (.m03 n)) (* (.m11 m) (.m13 n)) (* (.m12 m) (.m23 n)) (* (.m13 m) (.m33 n)))
+   (+ (* (.m20 m) (.m00 n)) (* (.m21 m) (.m10 n)) (* (.m22 m) (.m20 n)) (* (.m23 m) (.m30 n)))
+   (+ (* (.m20 m) (.m01 n)) (* (.m21 m) (.m11 n)) (* (.m22 m) (.m21 n)) (* (.m23 m) (.m31 n)))
+   (+ (* (.m20 m) (.m02 n)) (* (.m21 m) (.m12 n)) (* (.m22 m) (.m22 n)) (* (.m23 m) (.m32 n)))
+   (+ (* (.m20 m) (.m03 n)) (* (.m21 m) (.m13 n)) (* (.m22 m) (.m23 n)) (* (.m23 m) (.m33 n)))
+   (+ (* (.m30 m) (.m00 n)) (* (.m31 m) (.m10 n)) (* (.m32 m) (.m20 n)) (* (.m33 m) (.m30 n)))
+   (+ (* (.m30 m) (.m01 n)) (* (.m31 m) (.m11 n)) (* (.m32 m) (.m21 n)) (* (.m33 m) (.m31 n)))
+   (+ (* (.m30 m) (.m02 n)) (* (.m31 m) (.m12 n)) (* (.m32 m) (.m22 n)) (* (.m33 m) (.m32 n)))
+   (+ (* (.m30 m) (.m03 n)) (* (.m31 m) (.m13 n)) (* (.m32 m) (.m23 n)) (* (.m33 m) (.m33 n)))))
 
 ;; (mmul (identity-matrix) (identity-matrix))
 ;; (mmul (identity-matrix) [1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16])
 
 (defn mvmul
   "4x4 matrix multiplication M x N"
-  ^doubles [^doubles [m00 m01 m02 m03
-                      m10 m11 m12 m13
-                      m20 m21 m22 m23
-                      m30 m31 m32 m33]
-            ^doubles [v0 v1 v2 v3]]
+  ^Vector4
+  [^Matrix4x4 m ^Vector4 v]
   ;; vector is like a single column in 2nd matrix
-  [(+ (* m00 v0) (* m01 v1) (* m02 v2) (* m03 v3))
-   (+ (* m10 v0) (* m11 v1) (* m12 v2) (* m13 v3))
-   (+ (* m20 v0) (* m21 v1) (* m22 v2) (* m23 v3))
-   (+ (* m30 v0) (* m31 v1) (* m32 v2) (* m33 v3))])
+  (Vector4. (+ (* (.m00 m) (.x v)) (* (.m01 m) (.y v)) (* (.m02 m) (.z v)) (* (.m03 m) (.w v)))
+            (+ (* (.m10 m) (.x v)) (* (.m11 m) (.y v)) (* (.m12 m) (.z v)) (* (.m13 m) (.w v)))
+            (+ (* (.m20 m) (.x v)) (* (.m21 m) (.y v)) (* (.m22 m) (.z v)) (* (.m23 m) (.w v)))
+            (+ (* (.m30 m) (.x v)) (* (.m31 m) (.y v)) (* (.m32 m) (.z v)) (* (.m33 m) (.w v)))))
 
 ;; (mvmul (identity-matrix) [1 2 3 4])
 
 (defn vmuls
   "3d vector times scalar"
-  ^doubles [^doubles [x y z] ^double s]
-  [(* x s) (* y s) (* z s)])
+  ^Vector3
+  [^Vector3 v ^double s]
+  (Vector3. (* (.x v) s) (* (.y v) s) (* (.z v) s)))
+
+(defn vmul2s
+  "2d vector times scalar"
+  ^Vector2
+  [^Vector2 v ^double s]
+  (Vector2. (* (.x v) s) (* (.y v) s)))
 
 (defn vsub2
   "2d vector subtraction"
-  ^doubles [^doubles [u0 u1]
-            ^doubles [v0 v1]]
-  [(- u0 v0) (- u1 v1)])
+  ^Vector2
+  [^Vector2 u ^Vector2 v]
+  (Vector2. (- (.x u) (.x v)) (- (.y u) (.y v))))
 
 (defn vsub3
   "3d vector subtraction"
-  ^doubles [^doubles [u0 u1 u2]
-            ^doubles [v0 v1 v2]]
-  [(- u0 v0) (- u1 v1) (- u2 v2)])
+  ^Vector3
+  [^Vector3 u ^Vector3 v]
+  (Vector3. (- (.x u) (.x v)) (- (.y u) (.y v)) (- (.z u) (.z v))))
 
 (defn cross
   "3d vector cross product"
-  ^doubles [^doubles [u0 u1 u2]
-            ^doubles [v0 v1 v2]]
-  [(- (* u1 v2) (* u2 v1))
-   (- (* u2 v0) (* u0 v2))
-   (- (* u0 v1) (* u1 v0))])
+  ^Vector3
+  [^Vector3 u ^Vector3 v]
+  (Vector3.
+   (- (* (.y u) (.z v)) (* (.z u) (.y v)))
+   (- (* (.z u) (.x v)) (* (.x u) (.z v)))
+   (- (* (.x u) (.y v)) (* (.y u) (.x v)))))
 
-;; ??? if I put ^doubles on the return, this gives a error
-;; cannot be cast to clojure.lang.IFn
 (defn dot3
   "3d vector dot product"
-  [^doubles [u0 u1 u2]
-   ^doubles [v0 v1 v2]]
-  (+ (* u0 v0) (* u1 v1) (* u2 v2)))
+  ^double
+  [^Vector3 u ^Vector3 v]
+  (+ (* (.x u) (.x v)) (* (.y u) (.y v)) (* (.z u) (.z v))))
 
 (defn div3
   "3d vector divided by scalar"
-  ^doubles [^doubles [u0 u1 u2]
-            ^double v]
-  [(/ u0 v)
-   (/ u1 v)
-   (/ u2 v)])
+  ^Vector3
+  [^Vector3 u ^double s]
+  (Vector3. (/ (.x u) s)
+            (/ (.y u) s)
+            (/ (.z u) s)))
 
-(defn div ;; FIXME?
+(defn div ;; div4?
   "4d vector devided by scalar"
-  ^doubles [^doubles [u0 u1 u2 u3]
-            ^double v]
-  [(/ u0 v)
-   (/ u1 v)
-   (/ u2 v)
-   (/ u3 v)])
+  ^Vector4
+  [^Vector4 u ^double s]
+  (Vector4. (/ (.x u) s)
+            (/ (.y u) s)
+            (/ (.z u) s)
+            (/ (.w u) s)))
 
 (defn vmag ;; cannot add ^double to return ??? FIXME
   "3d vector magnitude"
-  [[^double x ^double y ^double z]]
-  (Math/sqrt (+ (* x x) (* y y) (* z z))))
+  ^double
+  [^Vector3 v]
+  (Math/sqrt (+ (* (.x v) (.x v)) (* (.y v) (.y v)) (* (.z v) (.z v)))))
 
 (defn vnorm
   "3d vector normalization"
-  ^doubles [^doubles u]
+  ^Vector3
+  [^Vector3 u]
   (let [mag (vmag u)]
     (if (= mag 1.0)
       u
       (if (= mag 0.0)
-        [0.0 0.0 0.0]
+        (Vector3. 0.0 0.0 0.0)
         (div3 u mag)))))
 
 ;; NOTE: OpenGL assumes Column Major Matrices in memory.  The above
@@ -133,56 +144,66 @@
 
 (defn translate
   "translate 4x4 matrix by 3d vector, returning new matrix"
-  ^doubles [^doubles m ^doubles[x y z]]
+  ^Matrix4x4
+  [^Matrix4x4 m ^Vector3 v]
   (mmul m
-        [1 0 0 x
-         0 1 0 y
-         0 0 1 z
-         0 0 0 1]))
+        (Matrix4x4.
+         1 0 0 (.x v)
+         0 1 0 (.y v)
+         0 0 1 (.z v)
+         0 0 0 1)))
 
 (defn rotate
   "rotate 4x4 matrix by angle radians about a 3d vector, returning new matrix"
-  ^doubles [^doubles m ^double angle ^doubles [x y z]]
-  (let [c       (Math/cos angle)
-        l-c     (- 1.0 c)
-        s       (Math/sin angle)
-        [x y z] (vnorm [x y z])]
+  ^Matrix4x4
+  [^Matrix4x4 m ^double angle ^Vector3 v]
+  (let [c   (Math/cos angle)
+        l-c (- 1.0 c)
+        s   (Math/sin angle)
+        v   (vnorm v)
+        x   (.x v)
+        y   (.y v)
+        z   (.z v)]
     (mmul m
           ;; man page:
           ;;[x^2(1-c)+c xy(1-c)-zs xz(1-c)+ys 0
           ;; yx(1-c)+zs y^2(1-c)+c yz(1-c)-xs 0
           ;; xz(1-c)-ys yz(1-c)+xs z^2(1-c)+c 0
           ;; 0          0          0          1]
-          [(+ (* x x l-c) c)       (- (* x y l-c) (* z s)) (+ (* x z l-c) (* y s)) 0.0
+          (Matrix4x4.
+           (+ (* x x l-c) c)       (- (* x y l-c) (* z s)) (+ (* x z l-c) (* y s)) 0.0
            (+ (* y x l-c) (* z s)) (+ (* y y l-c) c)       (- (* y z l-c) (* x s)) 0.0
            (- (* x z l-c) (* y s)) (+ (* y z l-c) (* x s)) (+ (* z z l-c) c)       0.0
-           0.0                     0.0                     0.0                     1.0]
-          )))
+           0.0                     0.0                     0.0                     1.0))))
 
 (defn scale
   "scale 4x4 matrix by 3d vector, returning new matrix"
-  ^doubles [^doubles m ^doubles[x y z]]
+  ^Matrix4x4
+  [^Matrix4x4 m ^Vector3 v]
   (mmul m
-        [x 0 0 0
-         0 y 0 0
-         0 0 z 0
-         0 0 0 1]))
+        (Matrix4x4.
+         (.x v) 0      0      0
+         0      (.y v) 0      0
+         0      0      (.z v) 0
+         0      0      0      1)))
 
 (defn look-at
   "return a 4x4 view matrix from eye 3d vector, to center 3d vector
   with upv 3d vector indicating the 'up' direction."
-  ^doubles
-  [^doubles eye ^doubles center ^doubles upv]
+  ^Matrix4x4
+  [^Vector3 eye ^Vector3 center ^Vector3 upv]
   (let [upv     (vnorm upv)
         forward (vnorm (vsub3 center eye))
         side    (vnorm (cross forward upv))
-        upv     (cross side forward) ;; gluLookAt code has this
-        ]
-    (translate [(side 0)        (side 1)        (side 2)        0.0
-                (upv 0)         (upv 1)         (upv 2)         0.0
-                (- (forward 0)) (- (forward 1)) (- (forward 2)) 0.0
-                0.0             0.0             0.0             1.0]
+        upv     (cross side forward)] ;; gluLookAt code has this
+    (translate (Matrix4x4.
+                (.x side)        (.y side)        (.z side)        0.0
+                (.x upv)         (.y upv)         (.z upv)         0.0
+                (- (.x forward)) (- (.y forward)) (- (.z forward)) 0.0
+                0.0              0.0              0.0              1.0)
                (vmuls eye -1.0))))
+
+;; unhinted as these are not perf issues (right?)
 
 (defn ortho
   "return 4x4 orthographic projection matrix"
@@ -193,10 +214,10 @@
         sx (/ 2.0 (- right left))
         sy (/ 2.0 (- top bottom))
         sz (/ 2.0 (- far near))]
-    [sx 0  0  tx
-     0  sy 0  ty
-     0  0  sz tz
-     0  0  0  1]))
+    (Matrix4x4.  sx 0  0  tx
+                 0  sy 0  ty
+                 0  0  sz tz
+                 0  0  0  1)))
 
 (defn frustum
   "return 4x4 perspective projection matrix"
@@ -207,10 +228,10 @@
         D (- (/ (* 2 far near) (- far near)))
         E (/ (* 2 far near) (- right left))
         F (/ (* 2 far near) (- top bottom))]
-    [E 0  A 0
-     0 F  B 0
-     0 0  C D
-     0 0 -1 0]))
+    (Matrix4x4. E 0  A 0
+                0 F  B 0
+                0 0  C D
+                0 0 -1 0)))
 
 (defn perspective
   "return 4x4 perspective projection matrix"
@@ -219,18 +240,7 @@
         C (- (/ (+ far near) (- far near)))
         D (- (/ (* 2 far near) (- far near)))
         F (/ f aspect)]
-    [F 0  0 0
-     0 f  0 0
-     0 0  C D
-     0 0 -1 0]))
-
-(defn mpr
-  "print 4x4 matrix for debug"
-  [[m00 m01 m02 m03
-    m10 m11 m12 m13
-    m20 m21 m22 m23
-    m30 m31 m32 m33]]
-  (println "[" m00 m01 m02 m03)
-  (println " " m10 m11 m12 m13)
-  (println " " m20 m21 m22 m23)
-  (println " " m30 m31 m32 m33 "]"))
+    (Matrix4x4. F 0  0 0
+                0 f  0 0
+                0 0  C D
+                0 0 -1 0)))

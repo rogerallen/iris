@@ -1,8 +1,13 @@
 (ns iris.pipeline
-  (:require [iris.matrix :as mat]
-            [iris.geometry :as g]))
+  (:require [clojure.pprint :as pp]
+            [iris.matrix :as mat]
+            [iris.geometry :as g])
+  (:import  [iris.matrix Matrix4x4 Vector2 Vector3 Vector4]))
 
 ;;(set! *warn-on-reflection* true)
+(defn v2->v3 [v2] (Vector3. (.x v2) (.y v2) 0.0))
+(defn v3->v2 [v3] (Vector2. (.x v3) (.y v3)))
+(defn v4->v3 [v4] (Vector3. (.x v4) (.y v4) (.y v4)))
 
 ;; ======================================================================
 ;; vertex shader helper routines
@@ -14,7 +19,8 @@
                   (mat/mmul (:projection-matrix state)
                             (mat/mmul (:view-matrix state)
                                       (:model-matrix state)))
-                      [(:nx v) (:ny v) (:nz v) 0])
+                  (Vector4. (:nx v) (:ny v) (:nz v) 0))
+          clip-n (v4->v3 clip-n)
           clip-n (mat/vnorm clip-n)
           n-dot-l (max 0 (mat/dot3 clip-n (:light-vector state)))]
       {:r (min 1.0 (+ (* 0.2 (:r v)) (* n-dot-l (:r v))))
@@ -32,7 +38,7 @@
                           ;; MV = V * M
                           (mat/mmul (:view-matrix state)
                                     (:model-matrix state)))
-                [(:x v) (:y v) (:z v) 1])
+                (Vector4. (:x v) (:y v) (:z v) 1))
         rgb-v (vertex-light state v)
         ]
     (into v {:clip clip-v   ;; required clip-coord vert
@@ -48,58 +54,60 @@
 (defn same-side?
   "are P1 and P2 both on the same side of the line through AB?"
   [P1 P2 A B]
-  (let [p1 (concat P1 [0])
-        p2 (concat P2 [0])
-        a  (concat A [0])
-        b  (concat B [0])
+  (let [p1  (v2->v3 P1)
+        p2  (v2->v3 P2)
+        a   (v2->v3 A)
+        b   (v2->v3 B)
         cp1 (mat/cross (mat/vsub3 b a) (mat/vsub3 p1 a))
         cp2 (mat/cross (mat/vsub3 b a) (mat/vsub3 p2 a))
-        dp (mat/dot3 cp1 cp2)]
+        dp  (mat/dot3 cp1 cp2)]
     (>= dp 0.0)))
 
 (defn pt-inside-tri?
   "is pt inside the triangle VA VB VC?"
   [va vb vc pt]
-  (let [A (take 2 va)
-        B (take 2 vb)
-        C (take 2 vc)]
+  (let [A (v3->v2 va)
+        B (v3->v2 vb)
+        C (v3->v2 vc)]
     (and (same-side? pt A B C)
          (same-side? pt B A C)
          (same-side? pt C A B))))
 
+(defn inside-port?
+  "ix x,y inside a viewport with they key view-key?"
+  [state view-key x y]
+  (and (>= x (.x (view-key state)))
+       (< x (+ (.x (view-key state)) (.z (view-key state))))
+       (>= y (.y (view-key state)))
+       (< y (+ (.y (view-key state)) (.w (view-key state))))))
+
 (defn in-viewport?
   "is x,y inside the viewport?"
   [state x y]
-  (and (>= x ((:viewport state) 0))
-       (< x (+ ((:viewport state) 0) ((:viewport state) 2)))
-       (>= y ((:viewport state) 1))
-       (< y (+ ((:viewport state) 1) ((:viewport state) 3)))))
+  (inside-port? state :viewport x y))
 
 (defn in-fb?
   "is x,y inside the framebuffer port that your thread owns?"
   [state x y]
-  (and (>= x ((:fbport state) 0))
-       (< x (+ ((:fbport state) 0) ((:fbport state) 2)))
-       (>= y ((:fbport state) 1))
-       (< y (+ ((:fbport state) 1) ((:fbport state) 3)))))
+  (inside-port? state :fbport x y))
 
 (defn rasterize-triangle
   "given 3 2d points, output the xy pairs describing the points inside."
   [state va vb vc]
-  (let [x-min (Math/floor (min (va 0) (vb 0) (vc 0)))
-        x-max (Math/ceil (max (va 0) (vb 0) (vc 0)))
-        y-min (Math/floor (min (va 1) (vb 1) (vc 1)))
-        y-max (Math/ceil (max (va 1) (vb 1) (vc 1)))]
+  (let [x-min (Math/floor ^double (min (.x va) (.x vb) (.x vc)))
+        x-max (Math/ceil  ^double (max (.x va) (.x vb) (.x vc)))
+        y-min (Math/floor ^double (min (.y va) (.y vb) (.y vc)))
+        y-max (Math/ceil  ^double (max (.y va) (.y vb) (.y vc)))]
     ;; it turned out to be very important for performance to make sure
     ;; we only rasterized pixels inside our thread's framebuffer.
-    (filter (fn [[x y]] (and (in-fb? state x y)
-                            (in-viewport? state x y)
-                            (pt-inside-tri? va vb vc [x y])))
+    (filter (fn [pt] (and (in-fb? state (.x pt) (.y pt))
+                         (in-viewport? state (.x pt) (.y pt))
+                         (pt-inside-tri? va vb vc pt)))
             ;; Be careful: (range 1.2 3.7) ==> (1.2 2.2 3.2).  Use floor/ceil
             (for [x (range x-min x-max)
                   y (range y-min y-max)]
               ;; pixels are centered in the middle
-              [(+ x 0.5) (+ y 0.5)]))))
+              (Vector2. (+ x 0.5) (+ y 0.5))))))
 
 ;; ======================================================================
 ;; pixel shader helper routines
@@ -107,11 +115,11 @@
 (defn triangle-area
   "find the area of the triangle given 3 2d points"
   [a b c]
-  (let [ab (concat (mat/vsub2 b a) [0])
-        ac (concat (mat/vsub2 c a) [0])
+  (let [ab (v2->v3 (mat/vsub2 b a))
+        ac (v2->v3 (mat/vsub2 c a))
         ;; we know mag is all in Z component when crossing xy0 vectors
         ;; wow, the following abs annotation helped perf significantly
-        mag (Math/abs ^double (nth (mat/cross ab ac) 2))]
+        mag (Math/abs ^double (.z (mat/cross ab ac)))]
   (* 0.5 mag)))
 
 (defn interpolate
@@ -126,14 +134,13 @@
 (defn shade-pixel
   "shade a single pixel and derive the :r :g :b color and :z depth. :x
    and :y are also passed through"
-  [prim [x y]]
-  (let [pt [x y]
-        pa (take 2 (:window (nth prim 0)))
-        pb (take 2 (:window (nth prim 1)))
-        pc (take 2 (:window (nth prim 2)))
-        oowa (nth (:window (nth prim 0)) 3)
-        oowb (nth (:window (nth prim 1)) 3)
-        oowc (nth (:window (nth prim 2)) 3)
+  [prim pt]
+  (let [pa (v3->v2 (:window (nth prim 0)))
+        pb (v3->v2 (:window (nth prim 1)))
+        pc (v3->v2 (:window (nth prim 2)))
+        oowa (.w (:window (nth prim 0)))
+        oowb (.w (:window (nth prim 1)))
+        oowc (.w (:window (nth prim 2)))
         Aabc (triangle-area pa pb pc)
         Apbc (triangle-area pt pb pc)
         Apac (triangle-area pt pa pc)
@@ -147,10 +154,9 @@
         r (interpolate :r prim aow bow cow)
         g (interpolate :g prim aow bow cow)
         b (interpolate :b prim aow bow cow)
-        z-prim (map #(hash-map :z (nth (:window (nth prim %)) 2)) (range 3))
-        z (interpolate :z z-prim aow bow cow)
-        ]
-    {:x x :y y :z z :r r :g g :b b}))
+        z-prim (map #(hash-map :z (.z (:window (nth prim %)))) (range 3))
+        z (interpolate :z z-prim aow bow cow)]
+    {:x (.x pt) :y (.y pt) :z z :r r :g g :b b}))
 
 ;; ======================================================================
 ;; framebuffer operation helper routines
@@ -172,8 +178,8 @@
     (for [src-pixel (flatten (map #(map :pixels %) object-prim-pixels))]
       (let [w (:width framebuffer)
             h (:height framebuffer)
-            x (Math/floor (- (:x src-pixel) ((:fbport state) 0)))
-            y (Math/floor (- (:y src-pixel) ((:fbport state) 1)))
+            x (Math/floor ^double (- (:x src-pixel) (.x (:fbport state))))
+            y (Math/floor ^double (- (:y src-pixel) (.y (:fbport state))))
             i (int (+ (* y w) x))]
         [i src-pixel])))))
 
@@ -188,7 +194,7 @@
   (binding [*out* *err*]
     (println "============================================================")
     (println lbl)
-    (println x)
+    (pp/pprint x)
     (println "============================================================"))
   x)
 
@@ -222,19 +228,23 @@
       ;; see OpenGL spec 2.11 Coordinate Transformations
       (let [clip-v (:clip v)
             ;; Normalized Device Coords = x/w y/w z/w 1/w
-            ndc-v (mat/div
-                   (concat (take 3 clip-v) [1])
-                   (nth clip-v 3))
-            [vox voy px py] (:viewport state)
+            ndc-v    (mat/div
+                      (Vector4. (.x clip-v) (.y clip-v) (.z clip-v) 1.0)
+                      (.w clip-v))
+            vox      (.x (:viewport state))
+            voy      (.y (:viewport state))
+            px       (.z (:viewport state))
+            py       (.w (:viewport state))
             ox       (+ vox (/ px 2))
-            window-x (+ (* (/ px 2) (ndc-v 0)) ox)
+            window-x (+ (* (/ px 2) (.x ndc-v)) ox)
             oy       (+ voy (/ py 2))
-            window-y (+ (* (/ py 2) (ndc-v 1)) oy)
-            [n f]    (:depth-range state)
-            window-z (+ (* (/ (- f n) 2) (ndc-v 2)) (/ (+ n f) 2))
-            window-w (ndc-v 3)
+            window-y (+ (* (/ py 2) (.y ndc-v)) oy)
+            n        (.x  (:depth-range state))
+            f        (.y  (:depth-range state))
+            window-z (+ (* (/ (- f n) 2) (.z ndc-v)) (/ (+ n f) 2))
+            window-w (.w ndc-v)
             ]
-        (into v {:window [window-x window-y window-z window-w]})))))
+        (into v {:window (Vector4. window-x window-y window-z window-w)})))))
 
 (defn primitive-clip-cull
   "for each object and window-space vertices, gather them into
@@ -293,6 +303,7 @@
        (primitive-clip-cull state)
        (rasterize state)
        (shade-pixels state)
+       ;;(debug-stage "a")
        (framebuffer-operations state framebuffer)))
 
 (defn parallel-render-framebuffer
@@ -302,16 +313,19 @@
   [n state framebuffer objects]
    (resolve-framebuffers
     framebuffer
-    (let [w (:width framebuffer)
-          h (:height framebuffer)
+    (let [w   (:width framebuffer)
+          h   (:height framebuffer)
           hon (int (/ h n))
-          _ (assert (zero? (rem h n)))
-          [fbx fby fbw fbh] (:fbport state)]
+          _   (assert (zero? (rem h n)))
+          fbx (.x (:fbport state))
+          fby (.y (:fbport state))
+          fbw (.z (:fbport state))
+          fbh (.w (:fbport state))]
       (for [cur-fby (range 0 h hon)]
         (future
           (render-framebuffer
            (assoc state
-             :fbport [fbx cur-fby fbw hon])
+             :fbport (Vector4. fbx cur-fby fbw hon))
            (assoc framebuffer
              :y      cur-fby
              :height hon
