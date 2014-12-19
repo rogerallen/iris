@@ -3,7 +3,7 @@
 Iris is a OpenGL 1.0-like graphics pipeline implemented in Clojure for
 educational purposes.  Others may find this useful for understanding a
 basic graphics pipeline.  I've used it to learn about programming in
-Clojure, lazy sequences and futures.
+Clojure, performance in Clojure, lazy sequences and futures.
 
 My main goals were:
 
@@ -41,9 +41,7 @@ the rendering...
 
 ## License
 
-Copyright © 2013 Roger Allen
+Copyright © 2013-2014 Roger Allen
 
 Distributed under the Eclipse Public License either version 1.0 or (at
 your option) any later version.
-
-[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/rogerallen/iris/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
