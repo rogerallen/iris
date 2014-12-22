@@ -82,6 +82,13 @@
    (- (* u2 v0) (* u0 v2))
    (- (* u0 v1) (* u1 v0))])
 
+(defn cross2s
+  "3d vector cross product with 2D inputs, returning only the z component"
+  ;;^double
+  [^doubles [u0 u1]
+   ^doubles [v0 v1]]
+  (- (* u0 v1) (* u1 v0)))
+
 ;; ??? if I put ^doubles on the return, this gives a error
 ;; cannot be cast to clojure.lang.IFn
 (defn dot3

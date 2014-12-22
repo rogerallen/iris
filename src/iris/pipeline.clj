@@ -48,24 +48,21 @@
 (defn same-side?
   "are P1 and P2 both on the same side of the line through AB?"
   [P1 P2 A B]
-  (let [p1 (concat P1 [0])
-        p2 (concat P2 [0])
-        a  (concat A [0])
-        b  (concat B [0])
-        cp1 (mat/cross (mat/vsub3 b a) (mat/vsub3 p1 a))
-        cp2 (mat/cross (mat/vsub3 b a) (mat/vsub3 p2 a))
-        dp (mat/dot3 cp1 cp2)]
+  (let [;; 2d cross products put all the data in .z, optimize for that
+        cp1 (mat/cross2s (mat/vsub2 B A) (mat/vsub2 P1 A))
+        cp2 (mat/cross2s (mat/vsub2 B A) (mat/vsub2 P2 A))
+        ;; a dot product does more work than necessary
+        ;;dp  (mat/dot3 cp1 cp2)
+        ;; optimized to
+        dp (* cp1 cp2)]
     (>= dp 0.0)))
 
 (defn pt-inside-tri?
   "is pt inside the triangle VA VB VC?"
-  [va vb vc pt]
-  (let [A (take 2 va)
-        B (take 2 vb)
-        C (take 2 vc)]
-    (and (same-side? pt A B C)
-         (same-side? pt B A C)
-         (same-side? pt C A B))))
+  [A B C pt]
+  (and (same-side? pt A B C)
+       (same-side? pt B A C)
+       (same-side? pt C A B)))
 
 (defn in-viewport?
   "is x,y inside the viewport?"
@@ -107,11 +104,11 @@
 (defn triangle-area
   "find the area of the triangle given 3 2d points"
   [a b c]
-  (let [ab (concat (mat/vsub2 b a) [0])
-        ac (concat (mat/vsub2 c a) [0])
+  (let [ab (mat/vsub2 b a)
+        ac (mat/vsub2 c a)
         ;; we know mag is all in Z component when crossing xy0 vectors
         ;; wow, the following abs annotation helped perf significantly
-        mag (Math/abs ^double (nth (mat/cross ab ac) 2))]
+        mag (Math/abs ^double (mat/cross2s ab ac))]
   (* 0.5 mag)))
 
 (defn interpolate
@@ -128,9 +125,9 @@
    and :y are also passed through"
   [prim [x y]]
   (let [pt [x y]
-        pa (take 2 (:window (nth prim 0)))
-        pb (take 2 (:window (nth prim 1)))
-        pc (take 2 (:window (nth prim 2)))
+        pa (subvec (:window (nth prim 0)) 0 2)
+        pb (subvec (:window (nth prim 1)) 0 2)
+        pc (subvec (:window (nth prim 2)) 0 2)
         oowa (nth (:window (nth prim 0)) 3)
         oowb (nth (:window (nth prim 1)) 3)
         oowc (nth (:window (nth prim 2)) 3)
@@ -257,9 +254,9 @@
     (for [prim primitives]
       {:prim prim
        :pixels (rasterize-triangle state
-                                   (:window (nth prim 0))
-                                   (:window (nth prim 1))
-                                   (:window (nth prim 2)))})))
+                                   (subvec (:window (nth prim 0)) 0 2)
+                                   (subvec (:window (nth prim 1)) 0 2)
+                                   (subvec (:window (nth prim 2)) 0 2))})))
 
 ;; FIXME -- allow user to specify a pixel shader
 (defn shade-pixels
