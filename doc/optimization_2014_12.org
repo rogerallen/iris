@@ -562,6 +562,13 @@ Going back to the original master branch, pulling out the general
 speedups I found and applying them results in the most improvement of
 all.  Wow!
 
+Just to be explicit, this is a 5.7x speedup from last week.
+
+#+begin_src bash
+14795.149657/2593.630651 = 5.70
+9169.407479/1599.242374 = 5.73
+#+end_src
+
 #+begin_src bash
 (216 cubes  no parallelism) : "Elapsed time: 2593.630651 msecs"
 (216 cubes  2x parallelism) : "Elapsed time: 1324.937414 msecs"
