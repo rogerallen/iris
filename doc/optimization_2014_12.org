@@ -4,7 +4,7 @@ inspired by http://insideclojure.org/2014/12/15/warn-on-boxed/
 
 * disassembling initial thoughts
 
-```
+#+begin_src bash
 (defn vmuls
   "3d vector times scalar"
   ^doubles [^doubles [x y z] ^double s]
@@ -138,11 +138,11 @@ inspired by http://insideclojure.org/2014/12/15/warn-on-boxed/
     41  invokestatic clojure.lang.RT.vector(java.lang.Object[]) : clojure.lang.IPersistentVector [48]
     44  checkcast double[] [50]
     47  areturn
-```
+#+end_src
 
 hmmm...
 
-```
+#+begin_src bash
 (println
   (disassemble
     (fn ^double [^double x ^double y ^double z ^double s]
@@ -161,13 +161,13 @@ hmmm...
     13  dmul
     14  dadd
     15  dreturn
-```
+#+end_src
 
 http://stackoverflow.com/questions/11824815/fast-complex-number-arithmetic-in-clojure
 also check out http://www.infoq.com/presentations/Crunching-Numbers-Clojure
 https://github.com/strangeloop/clojurewest2012-slides/blob/master/Solano-G%C3%B3mez-Crunching-Numbers-with-Clojure.pdf (download raw)
 
-```
+#+begin_src bash
 (deftype Vector3 [^double x ^double y ^double z])
 
 (println
@@ -198,11 +198,11 @@ https://github.com/strangeloop/clojurewest2012-slides/blob/master/Solano-G%C3%B3
     33  invokespecial iris.core.Vector3(double, double, double) [45]
     36  checkcast iris.core.Vector3 [32]
     39  areturn
-```
+#+end_src
 
 Well, it is simpler to add a defrecord. Will that work?
 
-```
+#+begin_src bash
 (defrecord Vector3 [^double x ^double y ^double z])
 
 (println
@@ -233,40 +233,40 @@ Well, it is simpler to add a defrecord. Will that work?
     33  invokespecial iris.matrix.Vector3(double, double, double) [45]
     36  checkcast iris.matrix.Vector3 [32]
     39  areturn
-```
+#+end_src
 
 Yep, looks good
 
 Okay, what is up here?
 
-```
+#+begin_src bash
 iris.matrix> ((fn ^Vector2 [^Vector2 u ^Vector2 v] (Vector2. (- (.x u) (.x v)) (- (.y u) (.y v))))
               (Vector2. 3 4)
               (Vector2. 1 2))
 #iris.matrix.Vector2{:x 2.0, :y 2.0}
-```
+#+end_src
 
 works, but
 
-```
+#+begin_src bash
 iris.matrix> ((fn ^Vector2 [^Vector2 v ^double s] (Vector2. (* (.x v) s) (* (.y v) s)))
               (Vector2. 1 2)
               3.0)
 NoSuchMethodError clojure.lang.IFn$ODO.invokePrim(Ljava/lang/Object;D)Liris/matrix/Vector2;  iris.matrix/eval3903/fn--3904 (form-init8016029507365162516.clj:-1)
-```
+#+end_src
 
 and stripping off the annotation works
 
-```
+#+begin_src bash
 iris.matrix> ((fn [^Vector2 v ^double s] (Vector2. (* (.x v) s) (* (.y v) s)))
               (Vector2. 1 2)
               3.0)
 #iris.matrix.Vector2{:x 3.0, :y 6.0}
-```
+#+end_src
 
 First case:
 
-```
+#+begin_src bash
 (println (disassemble (fn ^Vector2 [^Vector2 u ^Vector2 v] (Vector2. (- (.x u) (.x v)) (- (.y u) (.y v))))))
 
 // Compiled from form-init8016029507365162516.clj (version 1.5 : 49.0, super bit)
@@ -335,11 +335,11 @@ public final class iris.matrix$eval3914$fn__3915 extends clojure.lang.AFunction 
         [pc: 0, pc: 41] local: v index: 2 type: java.lang.Object
 
 }
-```
+#+end_src
 
 Vs:
 
-```
+#+begin_src bash
 (println (disassemble (fn ^Vector2 [^Vector2 v ^double s] (Vector2. (* (.x v) s) (* (.y v) s)))))
 
 // Compiled from form-init8016029507365162516.clj (version 1.5 : 49.0, super bit)
@@ -410,16 +410,17 @@ public final class iris.matrix$eval3918$fn__3919 extends clojure.lang.AFunction 
      6  invokestatic clojure.lang.RT.doubleCast(java.lang.Object) : double [54]
      9  invokeinterface clojure.lang.IFn$ODO.invokePrim(java.lang.Object, double) : iris.matrix.Vector2 [56] [nargs: 4]
     14  areturn
-```
+#+end_src
 
 That looks to me like the first one doesn't actually have a Vector2 return type.
 
 HA!  Updating to clojure 1.6.0 fixes this!
+
 * first results after implementation
 
 Not good!  46 seconds vs 8(!)
 
-```
+#+begin_src bash
 thunder 08:13:43 iris> lein test iris.perf-test
 
 lein test iris.perf-test
@@ -431,7 +432,8 @@ FAIL in (perf-test-all many-triangles) (perf_test.clj:184)
 216 cubes  no parallelism
 expected: (= crc the-crc)
   actual: (not (= 1521780774 1165338380))
-```
+#+end_src
+
 * profiling
 
 /System/Library/Frameworks/JavaVM.framework/Versions/Current/Commands/jvisualvm &
@@ -458,12 +460,14 @@ Now at *14s* for profiling.
 inside-port? is showing up as hotspot.
 put (view-key state) in a let with an annotation.  Now at 6 seconds!
 
+#+begin_src bash
 lein test iris.perf-test
 [crc mismatches not shown]
 (216 cubes  no parallelism) : "Elapsed time: 15760.320269 msecs"
 (216 cubes  2x parallelism) : "Elapsed time: 8362.59655 msecs"
 (216 cubes  3x parallelism) : "Elapsed time: 6214.615955 msecs"
 (216 cubes  4x parallelism) : "Elapsed time: 5845.003655 msecs"
+#+end_src
 
 okay lein run shows functional issues.  Need to go back & see where I
 went wrong.  pt-in-triangle may be returning true always.
@@ -473,6 +477,7 @@ Matching stuff seems okay, but still not better perf.
 
 new
 
+#+begin_src bash
 (single fullscreen triangle  no parallelism) : "Elapsed time: 5694.749797 msecs"
 (single fullscreen triangle  2x parallelism) : "Elapsed time: 2872.913789 msecs"
 (single fullscreen triangle  3x parallelism) : "Elapsed time: 2144.712486 msecs"
@@ -483,9 +488,11 @@ new
 (single fullscreen triangle 16x parallelism) : "Elapsed time: 2079.975679 msecs"
 (single fullscreen triangle 24x parallelism) : "Elapsed time: 1973.356779 msecs"
 (single fullscreen triangle 32x parallelism) : "Elapsed time: 2052.450574 msecs"
+#+end_src
 
 old
 
+#+begin_src bash
 (single fullscreen triangle  no parallelism) : "Elapsed time: 4882.02033 msecs"
 (single fullscreen triangle  2x parallelism) : "Elapsed time: 2651.232392 msecs"
 (single fullscreen triangle  3x parallelism) : "Elapsed time: 2061.476135 msecs"
@@ -496,12 +503,14 @@ old
 (single fullscreen triangle 16x parallelism) : "Elapsed time: 1619.04987 msecs"
 (single fullscreen triangle 24x parallelism) : "Elapsed time: 1844.076739 msecs"
 (single fullscreen triangle 32x parallelism) : "Elapsed time: 2039.124112 msecs"
+#+end_src
 
 v3->v2 is still taking gobs of time.  hacking around in the
 triangle-area routine gives a better result.
 
 Okay, now we're finally faster!
 
+#+begin_src bash
 (single fullscreen triangle  no parallelism) : "Elapsed time: 3581.05198 msecs"
 (single fullscreen triangle  2x parallelism) : "Elapsed time: 1989.578822 msecs"
 (single fullscreen triangle  3x parallelism) : "Elapsed time: 1336.251624 msecs"
@@ -512,9 +521,11 @@ Okay, now we're finally faster!
 (single fullscreen triangle 16x parallelism) : "Elapsed time: 1248.029342 msecs"
 (single fullscreen triangle 24x parallelism) : "Elapsed time: 1505.359094 msecs"
 (single fullscreen triangle 32x parallelism) : "Elapsed time: 1614.978974 msecs"
+#+end_src
 
 And I fixed the CRC issue and now we're faster and correct.
 
+#+begin_src bash
 (216 cubes  no parallelism) : "Elapsed time: 4296.909136 msecs"
 (216 cubes  2x parallelism) : "Elapsed time: 2552.969233 msecs"
 (216 cubes  3x parallelism) : "Elapsed time: 2009.485137 msecs"
@@ -535,6 +546,7 @@ And I fixed the CRC issue and now we're faster and correct.
 (single fullscreen triangle 16x parallelism) : "Elapsed time: 1191.819365 msecs"
 (single fullscreen triangle 24x parallelism) : "Elapsed time: 1547.907317 msecs"
 (single fullscreen triangle 32x parallelism) : "Elapsed time: 1695.183978 msecs"
+#+end_src
 
 But, I hacked up some stuff more than I wanted. I wonder if
 annotations on the conversions would help?
@@ -550,6 +562,7 @@ Going back to the original master branch, pulling out the general
 speedups I found and applying them results in the most improvement of
 all.  Wow!
 
+#+begin_src bash
 (216 cubes  no parallelism) : "Elapsed time: 2593.630651 msecs"
 (216 cubes  2x parallelism) : "Elapsed time: 1324.937414 msecs"
 (216 cubes  3x parallelism) : "Elapsed time: 921.86116 msecs"
@@ -570,6 +583,7 @@ all.  Wow!
 (single fullscreen triangle 16x parallelism) : "Elapsed time: 927.358319 msecs"
 (single fullscreen triangle 24x parallelism) : "Elapsed time: 1037.464765 msecs"
 (single fullscreen triangle 32x parallelism) : "Elapsed time: 1330.315375 msecs"
+#+end_src
 
 I suspect at this point perhaps the overhead of defrecord could be an issue?
 
