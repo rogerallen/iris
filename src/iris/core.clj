@@ -50,6 +50,50 @@
         ]
     (iris/parallel-render-framebuffer n state framebuffer objects)))
 
+(defn new-v2 [v]
+  (apply (fn [a b] (Vector2. a b)) v))
+(defn new-v3 [v]
+  (apply (fn [a b c] (Vector3. a b c)) v))
+(defn new-v4 [v]
+  (apply (fn [a b c d] (Vector4. a b c d)) v))
+(defn new-m4x4 [v]
+  (apply (fn [a b c d
+             e f g h
+             i j k l
+             m n o p]
+           (Matrix4x4.
+            a b c d
+            e f g h
+            i j k l
+            m n o p)) v))
+
+(defn contains-in?
+  [coll ks]
+  (let [k (first ks)]
+    (if (contains? coll k)
+      (if (empty? (rest ks))
+        true
+        (contains-in? (get coll k) (rest ks)))
+      false)))
+
+(defn update-in-if
+  [coll ks fn]
+  (if (contains-in? coll ks)
+    (update-in coll ks fn)
+    coll))
+
+(defn read-config
+  "read configuration file & convert a few fields to the proper types"
+  [edn-file]
+  (-> (edn/read-string (slurp edn-file))
+      (update-in-if [:state :viewport] #(new-v4 %))
+      (update-in-if [:state :fbport] #(new-v4 %))
+      (update-in-if [:state :light-vector] #(new-v3 %))
+      (update-in-if [:state :depth-range] #(new-v2 %))
+      (update-in-if [:state :view-matrix] #(new-m4x4 %))
+      (update-in-if [:state :model-matrix] #(new-m4x4 %))
+      (update-in-if [:state :projection-matrix] #(new-m4x4 %))))
+
 (defn -main
   [& args]
   (if (= 1 (count args))
@@ -57,7 +101,7 @@
     (let [edn-file    (first args)
           _           (binding [*out* *err*]
                         (println "Rendering from" edn-file))
-          config      (edn/read-string (slurp edn-file))
+          config      (read-config edn-file)
           ;;_ (pp/pprint config)
           n           (:parallelism config)
           state       (:state config)

@@ -5,9 +5,11 @@
   (:import  [iris.matrix Matrix4x4 Vector2 Vector3 Vector4]))
 
 ;;(set! *warn-on-reflection* true)
-(defn v2->v3 [v2] (Vector3. (.x v2) (.y v2) 0.0))
-(defn v3->v2 [v3] (Vector2. (.x v3) (.y v3)))
-(defn v4->v3 [v4] (Vector3. (.x v4) (.y v4) (.y v4)))
+;;(defn v2->v3 [v2] (Vector3. (.x v2) (.y v2) 0.0))
+;; adding annotations to these is key for perf
+(defn v3->v2 ^Vector2 [^Vector3 v3] (Vector2. (.x v3) (.y v3)))
+(defn v4->v2 ^Vector2 [^Vector4 v4] (Vector2. (.x v4) (.y v4)))
+(defn v4->v3 ^Vector3 [^Vector4 v4] (Vector3. (.x v4) (.y v4) (.z v4)))
 
 ;; ======================================================================
 ;; vertex shader helper routines
@@ -53,55 +55,53 @@
 ;; http://www.blackpawn.com/texts/pointinpoly/
 (defn same-side?
   "are P1 and P2 both on the same side of the line through AB?"
-  [P1 P2 A B]
-  (let [p1  (v2->v3 P1)
-        p2  (v2->v3 P2)
-        a   (v2->v3 A)
-        b   (v2->v3 B)
-        cp1 (mat/cross (mat/vsub3 b a) (mat/vsub3 p1 a))
-        cp2 (mat/cross (mat/vsub3 b a) (mat/vsub3 p2 a))
-        dp  (mat/dot3 cp1 cp2)]
+  [^Vector2 P1 ^Vector2 P2 ^Vector2 A ^Vector2 B]
+  (let [;; 2d cross products put all the data in .z, optimize for that
+        cp1 (mat/cross2s (mat/vsub2 B A) (mat/vsub2 P1 A))
+        cp2 (mat/cross2s (mat/vsub2 B A) (mat/vsub2 P2 A))
+        ;; a dot product does more work than necessary
+        ;;dp  (mat/dot3 cp1 cp2)
+        ;; optimized to
+        dp (* cp1 cp2)]
     (>= dp 0.0)))
 
 (defn pt-inside-tri?
-  "is pt inside the triangle VA VB VC?"
-  [va vb vc pt]
-  (let [A (v3->v2 va)
-        B (v3->v2 vb)
-        C (v3->v2 vc)]
-    (and (same-side? pt A B C)
-         (same-side? pt B A C)
-         (same-side? pt C A B))))
+  "is pt inside the triangle ABC?"
+  [^Vector2 A ^Vector2 B ^Vector2 C ^Vector2 pt]
+  (and (same-side? pt A B C)
+       (same-side? pt B A C)
+       (same-side? pt C A B)))
 
 (defn inside-port?
   "ix x,y inside a viewport with they key view-key?"
-  [state view-key x y]
-  (and (>= x (.x (view-key state)))
-       (< x (+ (.x (view-key state)) (.z (view-key state))))
-       (>= y (.y (view-key state)))
-       (< y (+ (.y (view-key state)) (.w (view-key state))))))
+  [state view-key ^Vector2 pt]
+  (let [v ^Vector4 (view-key state)]
+    (and (>= (.x pt) (.x v))
+         (<  (.x pt) (+ (.x v) (.z v)))
+         (>= (.y pt) (.y v))
+         (<  (.y pt) (+ (.y v) (.w v))))))
 
 (defn in-viewport?
   "is x,y inside the viewport?"
-  [state x y]
-  (inside-port? state :viewport x y))
+  [state ^Vector2 pt]
+  (inside-port? state :viewport pt))
 
 (defn in-fb?
   "is x,y inside the framebuffer port that your thread owns?"
-  [state x y]
-  (inside-port? state :fbport x y))
+  [state ^Vector2 pt]
+  (inside-port? state :fbport pt))
 
 (defn rasterize-triangle
   "given 3 2d points, output the xy pairs describing the points inside."
-  [state va vb vc]
+  [state ^Vector2 va ^Vector2 vb ^Vector2 vc]
   (let [x-min (Math/floor ^double (min (.x va) (.x vb) (.x vc)))
         x-max (Math/ceil  ^double (max (.x va) (.x vb) (.x vc)))
         y-min (Math/floor ^double (min (.y va) (.y vb) (.y vc)))
         y-max (Math/ceil  ^double (max (.y va) (.y vb) (.y vc)))]
     ;; it turned out to be very important for performance to make sure
     ;; we only rasterized pixels inside our thread's framebuffer.
-    (filter (fn [pt] (and (in-fb? state (.x pt) (.y pt))
-                         (in-viewport? state (.x pt) (.y pt))
+    (filter (fn [pt] (and (in-fb? state pt)
+                         (in-viewport? state pt)
                          (pt-inside-tri? va vb vc pt)))
             ;; Be careful: (range 1.2 3.7) ==> (1.2 2.2 3.2).  Use floor/ceil
             (for [x (range x-min x-max)
@@ -114,30 +114,30 @@
 
 (defn triangle-area
   "find the area of the triangle given 3 2d points"
-  [a b c]
-  (let [ab (v2->v3 (mat/vsub2 b a))
-        ac (v2->v3 (mat/vsub2 c a))
+  [^Vector2 a ^Vector2 b ^Vector2 c]
+  (let [ab (mat/vsub2 b a)
+        ac (mat/vsub2 c a)
         ;; we know mag is all in Z component when crossing xy0 vectors
         ;; wow, the following abs annotation helped perf significantly
-        mag (Math/abs ^double (.z (mat/cross ab ac)))]
+        mag (Math/abs ^double (mat/cross2s ab ac))]
   (* 0.5 mag)))
 
 (defn interpolate
   "interpolate barycentric coords according to formula 3.6 in OpenGL Spec 1.5"
   [attr prim aow bow cow]
-  (let [fa (attr (nth prim 0))
-        fb (attr (nth prim 1))
-        fc (attr (nth prim 2))]
+  (let [fa ^double (attr (nth prim 0))
+        fb ^double (attr (nth prim 1))
+        fc ^double (attr (nth prim 2))]
     (/ (+ (* fa aow) (* fb bow) (* fc cow))
-       (+ (* 1 aow) (* 1 bow) (* 1 cow))))) ;; FIXME for q
+       (+ aow bow cow)))) ;; FIXME for (+ q/aow q/bow q/cow)
 
 (defn shade-pixel
   "shade a single pixel and derive the :r :g :b color and :z depth. :x
    and :y are also passed through"
-  [prim pt]
-  (let [pa (v3->v2 (:window (nth prim 0)))
-        pb (v3->v2 (:window (nth prim 1)))
-        pc (v3->v2 (:window (nth prim 2)))
+  [prim ^Vector2 pt]
+  (let [pa (v4->v2 (:window (nth prim 0)))
+        pb (v4->v2 (:window (nth prim 1)))
+        pc (v4->v2 (:window (nth prim 2)))
         oowa (.w (:window (nth prim 0)))
         oowb (.w (:window (nth prim 1)))
         oowc (.w (:window (nth prim 2)))
@@ -151,9 +151,28 @@
         aow (* a oowa)
         bow (* b oowb)
         cow (* c oowc)
+        ;; this is apparently the hotspot for the code
         r (interpolate :r prim aow bow cow)
         g (interpolate :g prim aow bow cow)
         b (interpolate :b prim aow bow cow)
+        ;; inlining for hopeful perf speedup
+        ;; maybe I get 5% perf improvment for this?
+        ;; not worth it for just that small improvement
+        ;; p0 (nth prim 0)
+        ;; p1 (nth prim 1)
+        ;; p2 (nth prim 2)
+        ;; r ^double (/ (+ (* ^double (:r p0) aow)
+        ;;                 (* ^double (:r p1) bow)
+        ;;                 (* ^double (:r p2) cow))
+        ;;              (+ aow bow cow))
+        ;; g ^double (/ (+ (* ^double (:g p0) aow)
+        ;;                 (* ^double (:g p1) bow)
+        ;;                 (* ^double (:g p2) cow))
+        ;;              (+ aow bow cow))
+        ;; b ^double (/ (+ (* ^double (:b p0) aow)
+        ;;                 (* ^double (:b p1) bow)
+        ;;                 (* ^double (:b p2) cow))
+        ;;              (+ aow bow cow))
         z-prim (map #(hash-map :z (.z (:window (nth prim %)))) (range 3))
         z (interpolate :z z-prim aow bow cow)]
     {:x (.x pt) :y (.y pt) :z z :r r :g g :b b}))
@@ -226,7 +245,7 @@
   (for [vertices object-vertices]
     (for [v vertices]
       ;; see OpenGL spec 2.11 Coordinate Transformations
-      (let [clip-v (:clip v)
+      (let [clip-v   (:clip v)
             ;; Normalized Device Coords = x/w y/w z/w 1/w
             ndc-v    (mat/div
                       (Vector4. (.x clip-v) (.y clip-v) (.z clip-v) 1.0)
@@ -267,9 +286,9 @@
     (for [prim primitives]
       {:prim prim
        :pixels (rasterize-triangle state
-                                   (:window (nth prim 0))
-                                   (:window (nth prim 1))
-                                   (:window (nth prim 2)))})))
+                                   (v4->v2 (:window (nth prim 0)))
+                                   (v4->v2 (:window (nth prim 1)))
+                                   (v4->v2 (:window (nth prim 2))))})))
 
 ;; FIXME -- allow user to specify a pixel shader
 (defn shade-pixels

@@ -432,3 +432,145 @@ FAIL in (perf-test-all many-triangles) (perf_test.clj:184)
 expected: (= crc the-crc)
   actual: (not (= 1521780774 1165338380))
 ```
+* profiling
+
+/System/Library/Frameworks/JavaVM.framework/Versions/Current/Commands/jvisualvm &
+
+At this point, we were in the *mid-30s* for profiling.
+
+Using Profiler with preset of
+1) Start profiling iris.** and
+2) Do not profile clojure.*, ...
+
+(v2->v3) and (v3->v2) show up as significant issues.
+rasterize triangle is the top hotspot, then shade-pixels
+
+Found v2->v3 seemed to be used for cross products that could be optimized.  See cross2s
+
+Now at *20s* for profiling.
+
+(v3->v2) still shows up
+
+Found a way to do the conversion once per prim in rasterize-triangle
+
+Now at *14s* for profiling.
+
+inside-port? is showing up as hotspot.
+put (view-key state) in a let with an annotation.  Now at 6 seconds!
+
+lein test iris.perf-test
+[crc mismatches not shown]
+(216 cubes  no parallelism) : "Elapsed time: 15760.320269 msecs"
+(216 cubes  2x parallelism) : "Elapsed time: 8362.59655 msecs"
+(216 cubes  3x parallelism) : "Elapsed time: 6214.615955 msecs"
+(216 cubes  4x parallelism) : "Elapsed time: 5845.003655 msecs"
+
+okay lein run shows functional issues.  Need to go back & see where I
+went wrong.  pt-in-triangle may be returning true always.
+
+Okay some stuff now working & matching, but not lighting.
+Matching stuff seems okay, but still not better perf.
+
+new
+
+(single fullscreen triangle  no parallelism) : "Elapsed time: 5694.749797 msecs"
+(single fullscreen triangle  2x parallelism) : "Elapsed time: 2872.913789 msecs"
+(single fullscreen triangle  3x parallelism) : "Elapsed time: 2144.712486 msecs"
+(single fullscreen triangle  4x parallelism) : "Elapsed time: 1945.576305 msecs"
+(single fullscreen triangle  6x parallelism) : "Elapsed time: 1865.665903 msecs"
+(single fullscreen triangle  8x parallelism) : "Elapsed time: 1813.051601 msecs"
+(single fullscreen triangle 12x parallelism) : "Elapsed time: 1828.729529 msecs"
+(single fullscreen triangle 16x parallelism) : "Elapsed time: 2079.975679 msecs"
+(single fullscreen triangle 24x parallelism) : "Elapsed time: 1973.356779 msecs"
+(single fullscreen triangle 32x parallelism) : "Elapsed time: 2052.450574 msecs"
+
+old
+
+(single fullscreen triangle  no parallelism) : "Elapsed time: 4882.02033 msecs"
+(single fullscreen triangle  2x parallelism) : "Elapsed time: 2651.232392 msecs"
+(single fullscreen triangle  3x parallelism) : "Elapsed time: 2061.476135 msecs"
+(single fullscreen triangle  4x parallelism) : "Elapsed time: 1860.74629 msecs"
+(single fullscreen triangle  6x parallelism) : "Elapsed time: 1473.644829 msecs"
+(single fullscreen triangle  8x parallelism) : "Elapsed time: 1309.661062 msecs"
+(single fullscreen triangle 12x parallelism) : "Elapsed time: 1972.506385 msecs"
+(single fullscreen triangle 16x parallelism) : "Elapsed time: 1619.04987 msecs"
+(single fullscreen triangle 24x parallelism) : "Elapsed time: 1844.076739 msecs"
+(single fullscreen triangle 32x parallelism) : "Elapsed time: 2039.124112 msecs"
+
+v3->v2 is still taking gobs of time.  hacking around in the
+triangle-area routine gives a better result.
+
+Okay, now we're finally faster!
+
+(single fullscreen triangle  no parallelism) : "Elapsed time: 3581.05198 msecs"
+(single fullscreen triangle  2x parallelism) : "Elapsed time: 1989.578822 msecs"
+(single fullscreen triangle  3x parallelism) : "Elapsed time: 1336.251624 msecs"
+(single fullscreen triangle  4x parallelism) : "Elapsed time: 1356.560345 msecs"
+(single fullscreen triangle  6x parallelism) : "Elapsed time: 1126.806003 msecs"
+(single fullscreen triangle  8x parallelism) : "Elapsed time: 1110.197534 msecs"
+(single fullscreen triangle 12x parallelism) : "Elapsed time: 1420.191147 msecs"
+(single fullscreen triangle 16x parallelism) : "Elapsed time: 1248.029342 msecs"
+(single fullscreen triangle 24x parallelism) : "Elapsed time: 1505.359094 msecs"
+(single fullscreen triangle 32x parallelism) : "Elapsed time: 1614.978974 msecs"
+
+And I fixed the CRC issue and now we're faster and correct.
+
+(216 cubes  no parallelism) : "Elapsed time: 4296.909136 msecs"
+(216 cubes  2x parallelism) : "Elapsed time: 2552.969233 msecs"
+(216 cubes  3x parallelism) : "Elapsed time: 2009.485137 msecs"
+(216 cubes  4x parallelism) : "Elapsed time: 1957.306615 msecs"
+(216 cubes  6x parallelism) : "Elapsed time: 2046.001932 msecs"
+(216 cubes  8x parallelism) : "Elapsed time: 2322.24099 msecs"
+(216 cubes 12x parallelism) : "Elapsed time: 3017.912651 msecs"
+(216 cubes 16x parallelism) : "Elapsed time: 3551.944311 msecs"
+(216 cubes 24x parallelism) : "Elapsed time: 4679.56636 msecs"
+(216 cubes 32x parallelism) : "Elapsed time: 5816.013941 msecs"
+(single fullscreen triangle  no parallelism) : "Elapsed time: 3429.820826 msecs"
+(single fullscreen triangle  2x parallelism) : "Elapsed time: 1824.202668 msecs"
+(single fullscreen triangle  3x parallelism) : "Elapsed time: 1319.852346 msecs"
+(single fullscreen triangle  4x parallelism) : "Elapsed time: 1410.653814 msecs"
+(single fullscreen triangle  6x parallelism) : "Elapsed time: 1196.475094 msecs"
+(single fullscreen triangle  8x parallelism) : "Elapsed time: 1130.31839 msecs"
+(single fullscreen triangle 12x parallelism) : "Elapsed time: 1156.708277 msecs"
+(single fullscreen triangle 16x parallelism) : "Elapsed time: 1191.819365 msecs"
+(single fullscreen triangle 24x parallelism) : "Elapsed time: 1547.907317 msecs"
+(single fullscreen triangle 32x parallelism) : "Elapsed time: 1695.183978 msecs"
+
+But, I hacked up some stuff more than I wanted. I wonder if
+annotations on the conversions would help?
+
+Okay, I un-hacked the worst of it.  Still similar perf.
+
+Alright, the last remainging small hotspot is the interpolate function...
+I did some in-lining, but it made the code ugly for no apparent gain.
+
+* Ha!
+
+Going back to the original master branch, pulling out the general
+speedups I found and applying them results in the most improvement of
+all.  Wow!
+
+(216 cubes  no parallelism) : "Elapsed time: 2593.630651 msecs"
+(216 cubes  2x parallelism) : "Elapsed time: 1324.937414 msecs"
+(216 cubes  3x parallelism) : "Elapsed time: 921.86116 msecs"
+(216 cubes  4x parallelism) : "Elapsed time: 992.562389 msecs"
+(216 cubes  6x parallelism) : "Elapsed time: 991.780843 msecs"
+(216 cubes  8x parallelism) : "Elapsed time: 910.661297 msecs"
+(216 cubes 12x parallelism) : "Elapsed time: 1215.177516 msecs"
+(216 cubes 16x parallelism) : "Elapsed time: 1352.760895 msecs"
+(216 cubes 24x parallelism) : "Elapsed time: 1891.134987 msecs"
+(216 cubes 32x parallelism) : "Elapsed time: 2668.556759 msecs"
+(single fullscreen triangle  no parallelism) : "Elapsed time: 1599.242374 msecs"
+(single fullscreen triangle  2x parallelism) : "Elapsed time: 925.452086 msecs"
+(single fullscreen triangle  3x parallelism) : "Elapsed time: 1060.741359 msecs"
+(single fullscreen triangle  4x parallelism) : "Elapsed time: 675.00857 msecs"
+(single fullscreen triangle  6x parallelism) : "Elapsed time: 687.147944 msecs"
+(single fullscreen triangle  8x parallelism) : "Elapsed time: 641.089701 msecs"
+(single fullscreen triangle 12x parallelism) : "Elapsed time: 1342.737485 msecs"
+(single fullscreen triangle 16x parallelism) : "Elapsed time: 927.358319 msecs"
+(single fullscreen triangle 24x parallelism) : "Elapsed time: 1037.464765 msecs"
+(single fullscreen triangle 32x parallelism) : "Elapsed time: 1330.315375 msecs"
+
+I suspect at this point perhaps the overhead of defrecord could be an issue?
+
+But, at this point, I think I like the flexibility of what is on the main branch.

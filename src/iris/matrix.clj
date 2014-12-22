@@ -78,6 +78,12 @@
   [^Vector2 u ^Vector2 v]
   (Vector2. (- (.x u) (.x v)) (- (.y u) (.y v))))
 
+(defn vsub42
+  "2d vector subtraction with 4d,2d inputs"
+  ^Vector2
+  [^Vector4 u ^Vector2 v]
+  (Vector2. (- (.x u) (.x v)) (- (.y u) (.y v))))
+
 (defn vsub3
   "3d vector subtraction"
   ^Vector3
@@ -92,6 +98,14 @@
    (- (* (.y u) (.z v)) (* (.z u) (.y v)))
    (- (* (.z u) (.x v)) (* (.x u) (.z v)))
    (- (* (.x u) (.y v)) (* (.y u) (.x v)))))
+
+(defn cross2s
+  "3d vector cross product with 2D inputs, returning only the z component"
+  ^double
+  [^Vector2 u ^Vector2 v]
+   ;; x (- (* (.y u) 0.0) (* 0.0 (.y v)))
+   ;; y (- (* 0.0 (.x v)) (* (.x u) 0.0))
+   (- (* (.x u) (.y v)) (* (.y u) (.x v))))
 
 (defn dot3
   "3d vector dot product"
