@@ -49,8 +49,9 @@
   "are P1 and P2 both on the same side of the line through AB?"
   [P1 P2 A B]
   (let [;; 2d cross products put all the data in .z, optimize for that
-        cp1 (mat/cross2s (mat/vsub2 B A) (mat/vsub2 P1 A))
-        cp2 (mat/cross2s (mat/vsub2 B A) (mat/vsub2 P2 A))
+        AB  (mat/vsub2 B A)
+        cp1 (mat/cross2s AB (mat/vsub2 P1 A))
+        cp2 (mat/cross2s AB (mat/vsub2 P2 A))
         ;; a dot product does more work than necessary
         ;;dp  (mat/dot3 cp1 cp2)
         ;; optimized to
@@ -67,18 +68,22 @@
 (defn in-viewport?
   "is x,y inside the viewport?"
   [state x y]
-  (and (>= x ((:viewport state) 0))
-       (< x (+ ((:viewport state) 0) ((:viewport state) 2)))
-       (>= y ((:viewport state) 1))
-       (< y (+ ((:viewport state) 1) ((:viewport state) 3)))))
+  (let [vpx ((:viewport state) 0)
+        vpy ((:viewport state) 1)]
+    (and (>= x vpx)
+         (< x (+ vpx ((:viewport state) 2)))
+         (>= y vpy)
+         (< y (+ vpy ((:viewport state) 3))))))
 
 (defn in-fb?
   "is x,y inside the framebuffer port that your thread owns?"
   [state x y]
-  (and (>= x ((:fbport state) 0))
-       (< x (+ ((:fbport state) 0) ((:fbport state) 2)))
-       (>= y ((:fbport state) 1))
-       (< y (+ ((:fbport state) 1) ((:fbport state) 3)))))
+  (let [fbx ((:fbport state) 0)
+        fby ((:fbport state) 1)]
+    (and (>= x fbx)
+         (< x (+ fbx ((:fbport state) 2)))
+         (>= y fby)
+         (< y (+ fby ((:fbport state) 3))))))
 
 (defn rasterize-triangle
   "given 3 2d points, output the xy pairs describing the points inside."
