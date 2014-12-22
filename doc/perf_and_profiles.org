@@ -1,14 +1,14 @@
 * initial results
 
-```
+#+begin_src bash
 thunder 07:12:11 iris> lein with-profile dev test iris.perf-test
 (216 cubes  no parallelism) : "Elapsed time: 8776.367902 msecs"
 ^C
-```
+#+end_src
 
 What? this is 1/2 the speed of normal.
 
-```
+#+begin_src bash
 thunder 07:11:18 iris> lein test iris.perf-test
 (216 cubes  no parallelism) : "Elapsed time: 14606.117784 msecs"
 
@@ -23,11 +23,11 @@ thunder 07:16:27 iris> lein with-profile user test iris.perf-test
 (216 cubes  no parallelism) : "Elapsed time: 8917.121893 msecs"
 thunder 07:16:55 iris> lein with-profile provided test iris.perf-test
 (216 cubes  no parallelism) : "Elapsed time: 8702.617338 msecs"
-```
+#+end_src
 
 Okay, what is different between :base and the rest?
 
-```
+#+begin_src bash
 > lein show-profiles base
 {:resource-paths ["dev-resources"],
  :jvm-opts
@@ -35,7 +35,7 @@ Okay, what is different between :base and the rest?
   "-XX:TieredStopAtLevel=1"
   "-XX:-OmitStackTraceInFastThrow"],
 ...
-```
+#+end_src
 
 Well, now I understand wtf TierCompilation is!  UGH!
 
@@ -56,7 +56,7 @@ Okay, added that to project.clj...
 
 Nice 2x speed boost!
 
-```
+#+begin_src bash
 thunder 07:22:46 iris> lein test iris.perf-test
 
 lein test iris.perf-test
@@ -83,11 +83,11 @@ lein test iris.perf-test
 
 Ran 21 tests containing 20 assertions.
 0 failures, 0 errors.
-```
+#+end_src
 
 * old results for comparison
 
-```
+#+begin_src bash
 (216 cubes  no parallelism) : "Elapsed time: 14795.149657 msecs"
 (216 cubes  2x parallelism) : "Elapsed time: 8491.273422 msecs"
 (216 cubes  3x parallelism) : "Elapsed time: 6398.070178 msecs"
@@ -108,4 +108,4 @@ Ran 21 tests containing 20 assertions.
 (single fullscreen triangle 16x parallelism) : "Elapsed time: 4566.061129 msecs"
 (single fullscreen triangle 24x parallelism) : "Elapsed time: 4649.887223 msecs"
 (single fullscreen triangle 32x parallelism) : "Elapsed time: 5423.851433 msecs"
-```
+#+end_src
