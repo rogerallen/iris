@@ -595,3 +595,125 @@ Just to be explicit, this is a 5.7x speedup from last week.
 I suspect at this point perhaps the overhead of defrecord could be an issue?
 
 But, at this point, I think I like the flexibility of what is on the main branch.
+* using double-array
+
+asked wtf? on stack overflow...
+http://stackoverflow.com/questions/27671638/why-is-this-type-annotation-failing
+
+Tried using (double-array [1 2 3]) for everything...no dice--it got slower.
+
+lein test iris.perf-test
+(216 cubes  no parallelism) : "Elapsed time: 9308.375949 msecs"
+(216 cubes  2x parallelism) : "Elapsed time: 5206.39865 msecs"
+(216 cubes  3x parallelism) : "Elapsed time: 4381.14412 msecs"
+(216 cubes  4x parallelism) : "Elapsed time: 4674.926511 msecs"
+(216 cubes  6x parallelism) : "Elapsed time: 4329.25756 msecs"
+(216 cubes  8x parallelism) : "Elapsed time: 4571.784438 msecs"
+(216 cubes 12x parallelism) : "Elapsed time: 6094.627272 msecs"
+(216 cubes 16x parallelism) : "Elapsed time: 7540.179693 msecs"
+(216 cubes 24x parallelism) : "Elapsed time: 10783.82498 msecs"
+(216 cubes 32x parallelism) : "Elapsed time: 13616.487323 msecs"
+(single fullscreen triangle  no parallelism) : "Elapsed time: 5517.092364 msecs"
+(single fullscreen triangle  2x parallelism) : "Elapsed time: 2723.009397 msecs"
+(single fullscreen triangle  3x parallelism) : "Elapsed time: 2046.70173 msecs"
+(single fullscreen triangle  4x parallelism) : "Elapsed time: 2149.476969 msecs"
+(single fullscreen triangle  6x parallelism) : "Elapsed time: 1941.980581 msecs"
+(single fullscreen triangle  8x parallelism) : "Elapsed time: 1917.412988 msecs"
+(single fullscreen triangle 12x parallelism) : "Elapsed time: 2400.758826 msecs"
+(single fullscreen triangle 16x parallelism) : "Elapsed time: 3017.880897 msecs"
+(single fullscreen triangle 24x parallelism) : "Elapsed time: 3498.389367 msecs"
+(single fullscreen triangle 32x parallelism) : "Elapsed time: 4414.278437 msecs"
+
+Okay, going to try using https://github.com/ztellman/primitive-math
+
+* using primitive-math
+
+Alrighty!  This is waaay better now.
+
+#+begin_src bash
+lein test iris.perf-test
+(216 cubes  no parallelism) : "Elapsed time: 1931.921894 msecs"
+(216 cubes  2x parallelism) : "Elapsed time: 1008.232801 msecs"
+(216 cubes  3x parallelism) : "Elapsed time: 686.453068 msecs"
+(216 cubes  4x parallelism) : "Elapsed time: 675.946363 msecs"
+(216 cubes  6x parallelism) : "Elapsed time: 721.27126 msecs"
+(216 cubes  8x parallelism) : "Elapsed time: 961.145869 msecs"
+(216 cubes 12x parallelism) : "Elapsed time: 954.415495 msecs"
+(216 cubes 16x parallelism) : "Elapsed time: 1014.576405 msecs"
+(216 cubes 24x parallelism) : "Elapsed time: 1571.693896 msecs"
+(216 cubes 32x parallelism) : "Elapsed time: 1830.535151 msecs"
+(single fullscreen triangle  no parallelism) : "Elapsed time: 1312.748963 msecs"
+(single fullscreen triangle  2x parallelism) : "Elapsed time: 738.026696 msecs"
+(single fullscreen triangle  3x parallelism) : "Elapsed time: 556.508232 msecs"
+(single fullscreen triangle  4x parallelism) : "Elapsed time: 529.526084 msecs"
+(single fullscreen triangle  6x parallelism) : "Elapsed time: 478.281843 msecs"
+(single fullscreen triangle  8x parallelism) : "Elapsed time: 467.607609 msecs"
+(single fullscreen triangle 12x parallelism) : "Elapsed time: 816.01548 msecs"
+(single fullscreen triangle 16x parallelism) : "Elapsed time: 627.024968 msecs"
+(single fullscreen triangle 24x parallelism) : "Elapsed time: 794.304665 msecs"
+(single fullscreen triangle 32x parallelism) : "Elapsed time: 964.363928 msecs"
+#+end_src
+
+#+begin_src bash
+14795.149657/1931.921894 = 7.65
+9169.407479/1312.748963 = 6.98
+#+end_src
+
+After removing some double-array construction
+
+#+begin_src bash
+lein test iris.perf-test
+(216 cubes  no parallelism) : "Elapsed time: 1767.453057 msecs"
+(216 cubes  2x parallelism) : "Elapsed time: 966.114943 msecs"
+(216 cubes  3x parallelism) : "Elapsed time: 636.095948 msecs"
+(216 cubes  4x parallelism) : "Elapsed time: 708.604979 msecs"
+(216 cubes  6x parallelism) : "Elapsed time: 970.959931 msecs"
+(216 cubes  8x parallelism) : "Elapsed time: 616.27801 msecs"
+(216 cubes 12x parallelism) : "Elapsed time: 821.909129 msecs"
+(216 cubes 16x parallelism) : "Elapsed time: 904.205218 msecs"
+(216 cubes 24x parallelism) : "Elapsed time: 1155.058726 msecs"
+(216 cubes 32x parallelism) : "Elapsed time: 1433.042791 msecs"
+(single fullscreen triangle  no parallelism) : "Elapsed time: 1112.795829 msecs"
+(single fullscreen triangle  2x parallelism) : "Elapsed time: 621.516822 msecs"
+(single fullscreen triangle  3x parallelism) : "Elapsed time: 473.487015 msecs"
+(single fullscreen triangle  4x parallelism) : "Elapsed time: 484.71948 msecs"
+(single fullscreen triangle  6x parallelism) : "Elapsed time: 423.593976 msecs"
+(single fullscreen triangle  8x parallelism) : "Elapsed time: 428.208255 msecs"
+(single fullscreen triangle 12x parallelism) : "Elapsed time: 507.244406 msecs"
+(single fullscreen triangle 16x parallelism) : "Elapsed time: 636.026582 msecs"
+(single fullscreen triangle 24x parallelism) : "Elapsed time: 925.871964 msecs"
+(single fullscreen triangle 32x parallelism) : "Elapsed time: 1645.000944 msecs"
+#+end_src
+
+#+begin_src bash
+14795.149657/1767.453057 = 8.37
+9169.407479/1112.795829 = 8.23
+#+end_src
+
+I think we're now dominated by setup time.  Going to have to make the screens bigger.
+
+* New version of perf test
+
+#+begin_src bash
+lein test iris.perf-test
+(512 cubes  no parallelism) : "Elapsed time: 10111.669042 msecs"
+(512 cubes  2x parallelism) : "Elapsed time: 6240.653574 msecs"
+(512 cubes  3x parallelism) : "Elapsed time: 5093.12341 msecs"
+(512 cubes  4x parallelism) : "Elapsed time: 4325.960249 msecs"
+(512 cubes  6x parallelism) : "Elapsed time: 3993.311033 msecs"
+(512 cubes  8x parallelism) : "Elapsed time: 3903.345496 msecs"
+(512 cubes 12x parallelism) : "Elapsed time: 4211.483563 msecs"
+(512 cubes 16x parallelism) : "Elapsed time: 5008.49274 msecs"
+(512 cubes 24x parallelism) : "Elapsed time: 6224.248899 msecs"
+(512 cubes 32x parallelism) : "Elapsed time: 6903.455556 msecs"
+(single fullscreen triangle  no parallelism) : "Elapsed time: 11784.184516 msecs"
+(single fullscreen triangle  2x parallelism) : "Elapsed time: 7656.591937 msecs"
+(single fullscreen triangle  3x parallelism) : "Elapsed time: 5937.879183 msecs"
+(single fullscreen triangle  4x parallelism) : "Elapsed time: 4507.107014 msecs"
+(single fullscreen triangle  6x parallelism) : "Elapsed time: 6435.558707 msecs"
+(single fullscreen triangle  8x parallelism) : "Elapsed time: 3865.504396 msecs"
+(single fullscreen triangle 12x parallelism) : "Elapsed time: 7401.487492 msecs"
+(single fullscreen triangle 16x parallelism) : "Elapsed time: 5342.439737 msecs"
+(single fullscreen triangle 24x parallelism) : "Elapsed time: 10663.3523 msecs"
+(single fullscreen triangle 32x parallelism) : "Elapsed time: 8514.062685 msecs"
+#+end_src

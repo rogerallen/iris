@@ -16,9 +16,9 @@
                                {:x  1.0 :y -1.0 :z 0.5 :r 1.0 :g 1.0 :b 1.0}
                                {:x  1.0 :y  3.0 :z 0.5 :r 1.0 :g 1.0 :b 1.0}
                                ]}]
-          state {:viewport          [0 0 dim dim]
-                 :fbport            [0 0 dim dim]
-                 :depth-range       [0.0 1.0]
+          state {:viewport          (double-array [0 0 dim dim])
+                 :fbport            (double-array [0 0 dim dim])
+                 :depth-range       (double-array [0.0 1.0])
                  :view-matrix       (mat/identity-matrix)
                  :model-matrix      (mat/identity-matrix)
                  :projection-matrix (mat/identity-matrix)
@@ -48,9 +48,9 @@
                                {:x  1.0 :y -1.0 :z 0.5 :r 1.0 :g 1.0 :b 1.0}
                                {:x  1.0 :y  3.0 :z 0.5 :r 1.0 :g 1.0 :b 1.0}
                                ]}]
-          state {:viewport          [0 0 dim dim]
-                 :fbport            [0 0 dim dim]
-                 :depth-range       [0.0 1.0]
+          state {:viewport          (double-array [0 0 dim dim])
+                 :fbport            (double-array [0 0 dim dim])
+                 :depth-range       (double-array [0.0 1.0])
                  :view-matrix       (mat/identity-matrix)
                  :model-matrix      (mat/identity-matrix)
                  :projection-matrix (mat/identity-matrix)
@@ -81,9 +81,9 @@
                                {:x  1.0 :y -1.0 :z 0.5 :r 1.0 :g 1.0 :b 1.0}
                                {:x  1.0 :y  3.0 :z 0.5 :r 1.0 :g 1.0 :b 1.0}
                                ]}]
-          state {:viewport          [0 0 dim dim]
-                 :fbport            [0 0 dim dim]
-                 :depth-range       [0.0 1.0]
+          state {:viewport          (double-array [0 0 dim dim])
+                 :fbport            (double-array [0 0 dim dim])
+                 :depth-range       (double-array [0.0 1.0])
                  :view-matrix       (mat/identity-matrix)
                  :model-matrix      (mat/identity-matrix)
                  :projection-matrix (mat/identity-matrix)

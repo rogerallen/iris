@@ -6,16 +6,16 @@
 
 (defn single-fullscreen-triangle-setup
   []
-  (let [dim 384]
+  (let [dim 1152]
     [dim
      [{:type     :triangle-list
        :vertices [{:x -1.0 :y -1.0 :z 0.0 :r 1.0 :g 0.0 :b 0.0}
                   {:x  3.0 :y -1.0 :z 0.0 :r 0.0 :g 1.0 :b 0.0}
                   {:x -1.0 :y  3.0 :z 0.0 :r 0.0 :g 0.0 :b 1.0}
                   ]}]
-     {:viewport          [0 0 dim dim]
-      :fbport            [0 0 dim dim]
-      :depth-range       [0.0 1.0]
+     {:viewport          (double-array [0 0 dim dim])
+      :fbport            (double-array [0 0 dim dim])
+      :depth-range       (double-array [0.0 1.0])
       :view-matrix       (mat/identity-matrix)
       :model-matrix      (mat/identity-matrix)
       :projection-matrix (mat/identity-matrix)
@@ -26,7 +26,7 @@
       :height dim
       :data   (vec (repeat (* dim dim) {:r 0 :g 0 :b 0 :z 1}))
       }
-     4220896307]))
+     698736921]))
 
 ;; FIXME - would be nice to have a macro for this
 (deftest single-fullscreen-triangle
@@ -140,13 +140,13 @@
 ;; ======================================================================
 (defn many-triangles-setup
   []
-  (let [dim 384
+  (let [dim 768
         cubes (apply
                vector
                (flatten
-                (for [x (range -1.0 1.01 0.4)]
-                  (for [y (range -1.0 1.01 0.4)]
-                    (for [z (range -1.0 1.01 0.4)]
+                (for [x (range -1.0 1.01 0.3)]
+                  (for [y (range -1.0 1.01 0.3)]
+                    (for [z (range -1.0 1.01 0.3)]
                       {:type   :cube
                        :center [x y z]
                        :x-size 0.1 :y-size 0.1 :z-size 0.1
@@ -154,11 +154,13 @@
                        })))))]
     [dim
      cubes
-     {:viewport          [0 0 dim dim]
-      :fbport            [0 0 dim dim]
-      :depth-range       [0.0 1.0]
-      :light-vector      [0.5773502691896258 0.5773502691896258 -0.5773502691896258]
-      :view-matrix       (mat/look-at [0.2 1.7 -5.0] [0.0 0.0 0.0] [0.0 1.0 0.0])
+     {:viewport          (double-array [0 0 dim dim])
+      :fbport            (double-array [0 0 dim dim])
+      :depth-range       (double-array [0.0 1.0])
+      :light-vector      (double-array [0.5773502691896258 0.5773502691896258 -0.5773502691896258])
+      :view-matrix       (mat/look-at (double-array [0.2 1.7 -5.0])
+                                      (double-array [0.0 0.0 0.0])
+                                      (double-array [0.0 1.0 0.0]))
       :model-matrix      (mat/identity-matrix)
       :projection-matrix (mat/perspective (Math/toRadians 25) 1.0 1.0 10.0)
       }
@@ -168,11 +170,11 @@
       :height dim
       :data   (vec (repeat (* dim dim) {:r 0 :g 0 :b 0 :z 1}))
       }
-     1165338380]))
+     2084508379]))
 
 ;; FIXME - would be nice to have a macro for this
 (deftest many-triangles
-  (testing "216 cubes  no parallelism"
+  (testing "512 cubes  no parallelism"
     (let [[dim objects state framebuffer the-crc] (many-triangles-setup)
           _ (print *testing-contexts* ": ")
           framebuffer (time (iris/render-framebuffer state framebuffer objects))
@@ -181,7 +183,7 @@
       (is (= crc the-crc)))))
 
 (deftest many-triangles-2
-  (testing "216 cubes  2x parallelism"
+  (testing "512 cubes  2x parallelism"
     (let [n 2
           [dim objects state framebuffer the-crc] (many-triangles-setup)
           _ (print *testing-contexts* ": ")
@@ -192,7 +194,7 @@
       (is (= crc the-crc)))))
 
 (deftest many-triangles-3
-  (testing "216 cubes  3x parallelism"
+  (testing "512 cubes  3x parallelism"
     (let [n 3
           [dim objects state framebuffer the-crc] (many-triangles-setup)
           _ (print *testing-contexts* ": ")
@@ -203,7 +205,7 @@
       (is (= crc the-crc)))))
 
 (deftest many-triangles-4
-  (testing "216 cubes  4x parallelism"
+  (testing "512 cubes  4x parallelism"
     (let [n 4
           [dim objects state framebuffer the-crc] (many-triangles-setup)
           _ (print *testing-contexts* ": ")
@@ -214,7 +216,7 @@
       (is (= crc the-crc)))))
 
 (deftest many-triangles-6
-  (testing "216 cubes  6x parallelism"
+  (testing "512 cubes  6x parallelism"
     (let [n 6
           [dim objects state framebuffer the-crc] (many-triangles-setup)
           _ (print *testing-contexts* ": ")
@@ -225,7 +227,7 @@
       (is (= crc the-crc)))))
 
 (deftest many-triangles-8
-  (testing "216 cubes  8x parallelism"
+  (testing "512 cubes  8x parallelism"
     (let [n 8
           [dim objects state framebuffer the-crc] (many-triangles-setup)
           _ (print *testing-contexts* ": ")
@@ -236,7 +238,7 @@
       (is (= crc the-crc)))))
 
 (deftest many-triangles-12
-  (testing "216 cubes 12x parallelism"
+  (testing "512 cubes 12x parallelism"
     (let [n 12
           [dim objects state framebuffer the-crc] (many-triangles-setup)
           _ (print *testing-contexts* ": ")
@@ -247,7 +249,7 @@
       (is (= crc the-crc)))))
 
 (deftest many-triangles-16
-  (testing "216 cubes 16x parallelism"
+  (testing "512 cubes 16x parallelism"
     (let [n 16
           [dim objects state framebuffer the-crc] (many-triangles-setup)
           _ (print *testing-contexts* ": ")
@@ -258,7 +260,7 @@
       (is (= crc the-crc)))))
 
 (deftest many-triangles-24
-  (testing "216 cubes 24x parallelism"
+  (testing "512 cubes 24x parallelism"
     (let [n 24
           [dim objects state framebuffer the-crc] (many-triangles-setup)
           _ (print *testing-contexts* ": ")
@@ -269,7 +271,7 @@
       (is (= crc the-crc)))))
 
 (deftest many-triangles-32
-  (testing "216 cubes 32x parallelism"
+  (testing "512 cubes 32x parallelism"
     (let [n 32
           [dim objects state framebuffer the-crc] (many-triangles-setup)
           _ (print *testing-contexts* ": ")
