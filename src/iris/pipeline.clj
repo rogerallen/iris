@@ -6,6 +6,7 @@
 ;; Using https://github.com/ztellman/primitive-math to keep the math as I intend.
 (p/use-primitive-operators)
 ;;(set! *warn-on-reflection* true)
+(set! *unchecked-math* true)
 
 ;; ======================================================================
 ;; vertex shader helper routines

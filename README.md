@@ -14,6 +14,8 @@ graphics pipeline works in an easy-to-follow manner.
 parallelism of the graphics pipeline to achieve easy speedup via
 multiple concurrent threads.
 
+3. To learn about making Clojure performant.
+
 In case it isn't obvious, a non-goal is to actually create a useful
 graphics renderer.  :-)
 
@@ -28,6 +30,35 @@ gain almost perfect parallelism speedup on a fullscreen triangle
 render.
 
 I was also pleasantly surprised to see that emacs renders ppm files!
+
+Update: I did learn a couple things about clojure math performance
+that might be helpful to others.
+
+1. Leiningen DISABLES optimized compilation by default.
+
+Add `:jvm-opts ^:replace []` to your project.clj to enable the
+optimizer.  This helped me by 2x immediately.
+
+2. use `*warn-on-reflection` AND the primitive-math library.
+
+As https://github.com/ztellman/primitive-math explains, clojure does
+not warn you about basic math reflection.  Using primitive-math is
+essential for getting the best perf results!  This got me an
+additional 4x speedup.
+
+3. use a disassembler to see the code you are creating.
+
+http://insideclojure.org/2014/12/15/warn-on-boxed/ (note that
+unchecked-math doesn't help double math, but can help some integer
+math a bit)
+
+4. use `jvisualvm` to profile your code
+
+I bring up jvisualvm via
+`/System/Library/Frameworks/JavaVM.framework/Versions/Current/Commands/jvisualvm
+& `, select the 2nd clojure process, create a profile that only
+searches in the "iris.*" namespace, profile the CPU usage and it
+usually points out the issue to focus on.
 
 ## Usage
 

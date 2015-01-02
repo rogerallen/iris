@@ -8,6 +8,7 @@
 ;; Using https://github.com/ztellman/primitive-math to keep the math as I intend.
 (p/use-primitive-operators)
 ;;(set! *warn-on-reflection* true)
+(set! *unchecked-math* true)
 
 (defn identity-matrix
   "return a 4x4 identity matrix"
